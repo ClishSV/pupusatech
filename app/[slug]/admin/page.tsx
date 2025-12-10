@@ -150,8 +150,8 @@ export default function KitchenPage() {
         </div>
       )}
 
-      {/* HEADER COCINA */}
-      <div className="bg-white p-4 rounded-xl shadow-sm mb-6 flex justify-between items-center border-l-8 border-orange-500 sticky top-0 z-10">
+     {/* HEADER COCINA */}
+      <div className="bg-white p-4 rounded-xl shadow-sm mb-6 flex flex-col sm:flex-row justify-between items-center border-l-8 border-orange-500 sticky top-0 z-10 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">{restaurant.name}</h1>
           <div className="flex items-center gap-2">
@@ -159,11 +159,28 @@ export default function KitchenPage() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
             </span>
-            <p className="text-gray-500 text-sm">En Vivo • Sonido Activado</p>
+            <p className="text-gray-500 text-sm">En Vivo</p>
           </div>
         </div>
-        <div className="bg-orange-600 text-white px-4 py-2 rounded-lg font-bold shadow-lg text-xl">
-          {orders.length}
+
+        <div className="flex items-center gap-3">
+            {/* BOTÓN NUEVO: IR AL MENÚ */}
+            <a 
+              href={`/${slug}/admin/menu`}
+              className="bg-white border-2 border-gray-200 text-gray-700 px-4 py-2 rounded-lg font-bold hover:bg-gray-50 flex items-center gap-2 text-sm shadow-sm"
+            >
+              📝 Editar Menú
+            </a>
+
+            <button 
+                onClick={playNotificationSound}
+                className="text-xs bg-gray-200 px-3 py-2 rounded hover:bg-gray-300"
+            >
+                🔊 Audio
+            </button>
+            <div className="bg-orange-600 text-white px-4 py-2 rounded-lg font-bold shadow-lg text-xl">
+              {orders.length}
+            </div>
         </div>
       </div>
 
