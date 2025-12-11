@@ -18,7 +18,7 @@ export default function KitchenPage() {
   const [audioEnabled, setAudioEnabled] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  // --- AGRUPACIÓN ---
+  // --- AGRUPACIÓN DE ITEMS ---
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const groupItems = (items: any[]) => {
     const grouped: Record<string, any> = {}
@@ -33,7 +33,7 @@ export default function KitchenPage() {
     return Object.values(grouped)
   }
 
-  // --- AUDIO ---
+  // --- SONIDO ---
   const playNotificationSound = () => {
     if (!audioRef.current) return
     audioRef.current.currentTime = 0
@@ -52,7 +52,56 @@ export default function KitchenPage() {
     }).catch(e => console.error(e))
   }
 
-  // --- CARGA DE DATOS ---
+  // --- FUNCIÓN DE IMPRESIÓN TÉRMICA (TICKET) 🖨️ ---
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const printTicket = (order: any) => {
+    const items = groupItems(order.items)
+    
+    // Creamos una ventanita invisible para imprimir
+    const printWindow = window.open('', '', 'width=300,height=600')
+    if (!printWindow) return
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <style>
+            body { font-family: 'Courier New', monospace; width: 58mm; font-size: 12px; margin: 0; padding: 5px; }
+            .header { text-align: center; margin-bottom: 10px; border-bottom: 1px dashed black; padding-bottom: 5px; }
+            .title { font-size: 16px; font-weight: bold; }
+            .item { display: flex; justify-content: space-between; margin-bottom: 5px; }
+            .qty { font-weight: bold; margin-right: 5px; }
+            .total { border-top: 1px dashed black; margin-top: 10px; padding-top: 5px; text-align: right; font-size: 14px; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="title">${restaurant.name}</div>
+            <div>Mesa: ${order.table_number}</div>
+            <div>${new Date(order.created_at).toLocaleTimeString()}</div>
+          </div>
+          ${items.map((item: any) => `
+            <div class="item">
+              <div>
+                <span class="qty">${item.quantity}x</span>
+                ${item.name} <br/>
+                <small>${item.dough ? item.dough.toUpperCase() : ''}</small>
+              </div>
+              <div>$${(item.price * item.quantity).toFixed(2)}</div>
+            </div>
+          `).join('')}
+          <div class="total">Total: $${order.total.toFixed(2)}</div>
+          <br/><br/>.
+        </body>
+      </html>
+    `)
+    
+    printWindow.document.close()
+    printWindow.focus()
+    printWindow.print()
+    printWindow.close()
+  }
+
+  // --- CARGA DATOS ---
   useEffect(() => {
     audioRef.current = new Audio(NOTIFICATION_SOUND)
 
@@ -67,8 +116,8 @@ export default function KitchenPage() {
         .from('orders')
         .select('*')
         .eq('restaurant_id', restData.id)
-        .neq('status', 'delivered') // No mostrar entregados
-        .neq('status', 'cancelled') // NO MOSTRAR LOS CANCELADOS/RECHAZADOS
+        .neq('status', 'delivered')
+        .neq('status', 'cancelled')
         .order('created_at', { ascending: true })
 
       if (ordersData) setOrders(ordersData)
@@ -84,7 +133,6 @@ export default function KitchenPage() {
             filter: `restaurant_id=eq.${restData.id}`
           },
           (payload) => {
-            // Solo agregar si no es status 'cancelled' (por seguridad)
             if (payload.new.status !== 'cancelled') {
               setOrders((prev) => [...prev, payload.new])
               playNotificationSound()
@@ -101,26 +149,16 @@ export default function KitchenPage() {
     fetchInitialData()
   }, [slug])
 
-  // --- ACTUALIZAR ESTADOS ---
+  // --- ACTUALIZAR ESTADO (FLUJO SIMPLIFICADO) ---
   const updateStatus = async (orderId: string, newStatus: string) => {
-    // 1. UI Optimista
-    if (newStatus === 'cancelled' || newStatus === 'delivered') {
-      // Si se cancela o entrega, lo quitamos de la vista inmediatamente (o con delay)
-      if (newStatus === 'cancelled') {
-        setOrders(prev => prev.filter(o => o.id !== orderId))
-      } else {
-        // Delivered tiene un delay pequeño para ver el cambio
-        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o))
-        setTimeout(() => {
-          setOrders(prev => prev.filter(o => o.id !== orderId))
-        }, 2000)
-      }
+    // UI Optimista
+    if (newStatus === 'delivered' || newStatus === 'cancelled') {
+      setOrders(prev => prev.filter(o => o.id !== orderId))
     } else {
-      // Cambio normal (pending -> cooking)
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o))
     }
 
-    // 2. Base de Datos
+    // Base de datos
     await supabase.from('orders').update({ status: newStatus }).eq('id', orderId)
   }
 
@@ -133,11 +171,10 @@ export default function KitchenPage() {
   return (
     <div className="min-h-screen bg-gray-100 p-4 relative">
       
-      {/* PANTALLA BLOQUEO AUDIO */}
       {!audioEnabled && (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-90 flex flex-col items-center justify-center text-white p-4">
           <div className="text-6xl mb-4 animate-bounce">👆</div>
-          <h2 className="text-3xl font-bold mb-4">Activar Panel</h2>
+          <h2 className="text-3xl font-bold mb-4">Activar Cocina</h2>
           <button onClick={enableAudio} className="bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-10 rounded-2xl text-xl shadow-2xl">
             INICIAR TURNO 🔊
           </button>
@@ -153,7 +190,7 @@ export default function KitchenPage() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
             </span>
-            <p className="text-gray-500 text-sm">En Vivo</p>
+            <p className="text-gray-500 text-sm">Cocina en Vivo</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -170,7 +207,7 @@ export default function KitchenPage() {
       {orders.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-64 text-gray-400">
           <div className="text-6xl mb-4">👨‍🍳</div>
-          <p className="text-xl">Todo limpio, chef.</p>
+          <p className="text-xl">Olla limpia, corazón contento.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -178,20 +215,19 @@ export default function KitchenPage() {
             <div 
               key={order.id} 
               className={`bg-white rounded-xl shadow-md overflow-hidden border-2 transition-all flex flex-col ${
-                order.status === 'pending' ? 'border-gray-400 animate-pulse' : // PENDIENTE = GRIS/NEUTRO
-                order.status === 'cooking' ? 'border-yellow-400' : 
-                'border-green-500 bg-green-50'
+                order.status === 'pending' ? 'border-gray-600' : // PENDIENTE = GRIS
+                'border-green-500 bg-green-50' // COCINANDO = VERDE (Activo)
               }`}
             >
               {/* CABECERA */}
               <div className={`p-3 text-white flex justify-between items-center ${
-                 order.status === 'pending' ? 'bg-gray-700' : // PENDIENTE = OSCURO
-                 order.status === 'cooking' ? 'bg-yellow-500' : 
-                 'bg-green-500'
+                 order.status === 'pending' ? 'bg-gray-700' : 'bg-green-600'
               }`}>
                 <div className="flex flex-col">
                   <span className="font-extrabold text-xl">{order.table_number}</span>
-                  {order.status === 'pending' && <span className="text-[10px] bg-red-500 px-1 rounded uppercase tracking-wider">Por Confirmar</span>}
+                  <span className="text-[10px] uppercase opacity-90">
+                    {order.status === 'pending' ? 'Por Confirmar' : 'En Plancha'}
+                  </span>
                 </div>
                 <span className="text-xs font-bold bg-black bg-opacity-20 px-2 py-1 rounded">
                   {formatTime(order.created_at)}
@@ -202,9 +238,9 @@ export default function KitchenPage() {
               <div className="p-3 space-y-2 flex-1 overflow-y-auto max-h-80">
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {groupItems(order.items).map((item: any, index: number) => (
-                  <div key={index} className="flex justify-between items-center p-2 rounded-lg bg-gray-50 border border-gray-100">
+                  <div key={index} className="flex justify-between items-center p-2 rounded-lg bg-white/50 border border-gray-100">
                     <div className="flex items-center gap-3">
-                      <span className="bg-white border-2 border-gray-200 text-gray-700 w-8 h-8 flex items-center justify-center rounded-full font-extrabold text-md shadow-sm">
+                      <span className="bg-white border-2 border-gray-200 text-gray-800 w-8 h-8 flex items-center justify-center rounded-full font-extrabold text-lg shadow-sm">
                         {item.quantity}
                       </span>
                       <div className="leading-tight">
@@ -217,50 +253,51 @@ export default function KitchenPage() {
                 ))}
               </div>
 
-              {/* FOOTER ACCIONES */}
-              <div className="p-3 bg-gray-50 border-t border-gray-200">
+              {/* ACCIONES SIMPLIFICADAS (2 TOQUES) */}
+              <div className="p-3 bg-gray-50 border-t border-gray-200 space-y-2">
                 
-                {/* ESTADO PENDIENTE: VALIDAR O RECHAZAR */}
+                {/* PASO 1: PENDIENTE -> ACEPTAR/COCINAR */}
                 {order.status === 'pending' && (
                   <div className="grid grid-cols-2 gap-2">
                     <button 
                       onClick={() => {
-                        if(confirm('¿Rechazar este pedido? Se borrará de la lista.')) {
-                          updateStatus(order.id, 'cancelled')
-                        }
+                        if(confirm('¿Rechazar broma?')) updateStatus(order.id, 'cancelled')
                       }}
-                      className="bg-red-100 hover:bg-red-200 text-red-600 font-bold py-3 rounded-xl transition text-sm"
+                      className="bg-red-100 text-red-600 font-bold py-3 rounded-xl hover:bg-red-200 text-sm"
                     >
                       ❌ Rechazar
                     </button>
                     <button 
-                      onClick={() => updateStatus(order.id, 'cooking')}
-                      className="bg-gray-800 hover:bg-black text-white font-bold py-3 rounded-xl shadow-lg transition transform active:scale-95 text-sm"
+                      onClick={() => {
+                        updateStatus(order.id, 'cooking') // Pasa a cocinar
+                        // printTicket(order) // Descomenta si quieres imprimir automático al aceptar
+                      }}
+                      className="bg-gray-800 text-white font-bold py-3 rounded-xl hover:bg-black shadow-lg text-sm"
                     >
-                      ✅ ACEPTAR
+                      🔥 A LA PLANCHA
                     </button>
                   </div>
                 )}
 
-                {/* ESTADO COCINANDO */}
+                {/* PASO 2: COCINANDO -> ENTREGAR (FIN) */}
                 {order.status === 'cooking' && (
-                  <button 
-                    onClick={() => updateStatus(order.id, 'ready')}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl shadow-lg transition transform active:scale-95 flex items-center justify-center gap-2"
-                  >
-                    <span>🛎️</span> LISTO
-                  </button>
+                  <div className="flex flex-col gap-2">
+                    <button 
+                      onClick={() => printTicket(order)}
+                      className="w-full bg-white border-2 border-gray-300 text-gray-700 font-bold py-2 rounded-xl hover:bg-gray-100 flex items-center justify-center gap-2"
+                    >
+                      🖨️ Imprimir Ticket
+                    </button>
+                    
+                    <button 
+                      onClick={() => updateStatus(order.id, 'delivered')}
+                      className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl shadow-lg transition transform active:scale-95"
+                    >
+                      📦 ENTREGAR Y ARCHIVAR
+                    </button>
+                  </div>
                 )}
 
-                {/* ESTADO LISTO */}
-                {order.status === 'ready' && (
-                  <button 
-                    onClick={() => updateStatus(order.id, 'delivered')}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow transition"
-                  >
-                    📦 ENTREGADO
-                  </button>
-                )}
               </div>
             </div>
           ))}
