@@ -49,3 +49,12 @@ button:active {
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+/* Animación de flotación para la Landing Page */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+.animate-bounce-slow {
+  animation: float 3s ease-in-out infinite;
+}
