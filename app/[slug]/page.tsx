@@ -258,7 +258,7 @@ export default function MenuPage() {
           MEJORA 2: TARJETAS DE ITEMS MÁS ATRACTIVAS
           ========================================== */}
       <div className="max-w-md mx-auto p-4 space-y-6">
-        {['pupusas', 'bebidas'].map(category => {
+        {['pupusas', 'extras', 'bebidas', 'postres'].map(category => {
           const items = menu.filter((item: any) => item.category === category)
           if (items.length === 0) return null
           
@@ -266,9 +266,12 @@ export default function MenuPage() {
             <div key={category}>
               <div className="flex items-center gap-2 mb-4">
                 <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
-                <h2 className="text-xl font-extrabold text-gray-800 tracking-tight">
-                  {category === 'pupusas' ? '🔥 Pupusas' : '🥤 Bebidas'}
-                </h2>
+               <h2 className="text-xl font-extrabold text-gray-800 tracking-tight capitalize flex items-center gap-2">
+  {category === 'pupusas' && '🔥 Pupusas'}
+  {category === 'extras' && '✨ Extras'}
+  {category === 'bebidas' && '🥤 Bebidas'}
+  {category === 'postres' && '🍰 Postres'}
+</h2>
                 <div className="flex-1 h-px bg-gradient-to-r from-gray-300 via-transparent to-transparent"></div>
               </div>
               
@@ -280,17 +283,30 @@ export default function MenuPage() {
                     className="group bg-white p-4 rounded-2xl shadow-md border-2 border-gray-50 flex justify-between items-center cursor-pointer hover:shadow-xl hover:border-orange-300 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
                   >
                     <div className="flex items-center gap-4 flex-1">
-                      <div className="w-16 h-16 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl flex items-center justify-center text-4xl shadow-inner group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300">
-                        {item.image_url || '🥘'}
-                      </div>
+                     <div className="w-16 h-16 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl flex items-center justify-center shadow-inner group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300 overflow-hidden relative">
+  {item.image_url && item.image_url.startsWith('/') ? (
+    /* CASO 1: ES UNA FOTO REAL */
+    <img 
+      src={item.image_url} 
+      alt={item.name} 
+      className="w-full h-full object-cover"
+    />
+  ) : (
+    /* CASO 2: ES UN EMOJI */
+    <span className="text-4xl">{item.image_url || '🥘'}</span>
+  )}
+</div>
                       
                       <div className="flex-1">
                         <h3 className="font-bold text-gray-800 text-base leading-tight group-hover:text-orange-600 transition-colors">
                           {item.name}
                         </h3>
-                        <p className="text-gray-400 text-xs font-medium mt-1">
-                          {item.category === 'pupusas' ? '🌽 Del comal a tu mesa' : '❄️ Bebida refrescante'}
-                        </p>
+                      <p className="text-gray-400 text-xs font-medium mt-1">
+  {item.category === 'pupusas' && '🌽 Del comal a tu mesa'}
+  {item.category === 'bebidas' && '❄️ Bebida refrescante'}
+  {item.category === 'extras' && '🌶️ El complemento perfecto'}
+  {item.category === 'postres' && '🍰 Un dulce final'}
+</p>
                         <p className="text-orange-600 font-extrabold text-lg mt-1">
                           ${item.price.toFixed(2)}
                         </p>
@@ -363,7 +379,7 @@ export default function MenuPage() {
                         <div className="w-10 h-10 bg-white border-2 border-gray-300 rounded-full flex items-center justify-center text-xl shadow-md">🍚</div>
                         <div>
                           <span className="font-bold text-gray-800 text-lg block">Arroz</span>
-                          <span className="text-xs text-gray-600">Sin gluten</span>
+                          <span className="text-xs text-gray-600">Sabor único</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
