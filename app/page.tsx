@@ -40,14 +40,18 @@ export default function LandingPage() {
             {/* Desktop Menu */}
             <div className="hidden lg:flex items-center gap-8 text-sm font-semibold">
               <a href="#beneficios" className="text-gray-700 hover:text-orange-600 transition-colors">Beneficios</a>
-              <a href="#demo" className="text-gray-700 hover:text-orange-600 transition-colors">Demo en Vivo</a>
+              <a href="#demo" className="text-gray-700 hover:text-orange-600 transition-colors">Demo</a>
               <a href="#precios" className="text-gray-700 hover:text-orange-600 transition-colors">Precios</a>
+              {/* NUEVO ENLACE DE LOGIN */}
+              <Link href="/login" className="text-gray-900 hover:text-orange-600 transition-colors font-bold flex items-center gap-2">
+                <Users size={16} /> Soy Cliente
+              </Link>
             </div>
 
             {/* CTA Button */}
             <div className="flex items-center gap-4">
               <a 
-                href="https://wa.me/50373933442?text=Hola,%20me%20interesa%20digitalizar%20mi%20pupusería" 
+                href="https://wa.me/50373933442?text=Hola..." 
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hidden sm:flex items-center gap-2 bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-3 rounded-full text-sm font-bold hover:from-orange-700 hover:to-red-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
@@ -72,8 +76,15 @@ export default function LandingPage() {
           <div className="lg:hidden bg-white border-t border-gray-100 shadow-lg animate-fade-in">
             <div className="px-4 py-6 space-y-4">
               <a href="#beneficios" onClick={() => setMobileMenuOpen(false)} className="block text-gray-700 font-semibold hover:text-orange-600 transition-colors py-2">Beneficios</a>
-              <a href="#demo" onClick={() => setMobileMenuOpen(false)} className="block text-gray-700 font-semibold hover:text-orange-600 transition-colors py-2">Demo en Vivo</a>
+              <a href="#demo" onClick={() => setMobileMenuOpen(false)} className="block text-gray-700 font-semibold hover:text-orange-600 transition-colors py-2">Demo</a>
               <a href="#precios" onClick={() => setMobileMenuOpen(false)} className="block text-gray-700 font-semibold hover:text-orange-600 transition-colors py-2">Precios</a>
+              <Link 
+                href="/login" 
+                onClick={() => setMobileMenuOpen(false)}
+                className="block text-gray-900 font-bold hover:text-orange-600 transition-colors py-2 flex items-center gap-2"
+              >
+                <Users size={16} /> Soy Cliente
+              </Link>
               <a 
                 href="https://wa.me/50373933442" 
                 className="block bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-3 rounded-xl text-center font-bold"
@@ -276,13 +287,13 @@ export default function LandingPage() {
       </section>
 
       {/* ==========================================
-          PRECIOS (ESTILO IDÉNTICO A CAPTURA)
+          PRECIOS CLAROS Y TRANSPARENTES
           ========================================== */}
       <section id="precios" className="py-24 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 text-center mb-16">
           <h2 className="text-4xl font-black mb-4">Precios Claros</h2>
-          <p className="text-xl text-gray-600 font-medium">
-            Sin comisiones por venta. Solo una tarifa plana justa.
+          <p className="text-xl text-gray-600 font-medium max-w-2xl mx-auto">
+            Sin comisiones por venta. Solo una tarifa plana justa y un pago único para dejarte todo listo.
           </p>
         </div>
 
@@ -291,9 +302,15 @@ export default function LandingPage() {
           {/* Plan Emprendedor */}
           <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-200 flex flex-col hover:shadow-lg transition-all">
             <h3 className="text-xl font-bold text-gray-600 mb-2">Plan Emprendedor</h3>
-            <div className="flex items-baseline gap-1 mb-6">
+            <div className="flex items-baseline gap-1 mb-4">
               <span className="text-5xl font-black text-gray-900">$15</span>
               <span className="text-lg text-gray-400 font-medium">/mes</span>
+            </div>
+
+            {/* AVISO DE SETUP */}
+            <div className="bg-gray-100 rounded-xl p-3 mb-6 text-sm text-gray-600 border border-gray-200">
+              <p><span className="font-bold text-gray-900">+ $50 Pago Único</span> de Inscripción.</p>
+              <p className="text-xs mt-1">Incluye: Creación de menú y diseño de QRs.</p>
             </div>
             
             <ul className="space-y-4 mb-8 text-gray-600 flex-1 text-left">
@@ -307,16 +324,22 @@ export default function LandingPage() {
             </a>
           </div>
 
-          {/* Plan Negocio Pro (Destacado) */}
+          {/* Plan Negocio Pro */}
           <div className="bg-white p-8 rounded-3xl shadow-xl border-2 border-orange-500 relative flex flex-col transform md:scale-105 z-10">
             <div className="absolute top-0 right-0 bg-orange-500 text-white text-[10px] uppercase font-bold px-3 py-1 rounded-bl-xl rounded-tr-xl tracking-wider">
               MÁS POPULAR
             </div>
             
             <h3 className="text-xl font-bold text-orange-600 mb-2">Plan Negocio Pro</h3>
-            <div className="flex items-baseline gap-1 mb-6">
+            <div className="flex items-baseline gap-1 mb-4">
               <span className="text-5xl font-black text-gray-900">$25</span>
               <span className="text-lg text-gray-400 font-medium">/mes</span>
+            </div>
+
+            {/* AVISO DE SETUP DESTACADO */}
+            <div className="bg-orange-50 rounded-xl p-3 mb-6 text-sm text-orange-800 border border-orange-100">
+              <p><span className="font-bold">+ $75 Pago Único</span> de Inscripción.</p>
+              <p className="text-xs mt-1 opacity-80">Incluye: Configuración de Tablet, Fotos profesionales y Capacitación.</p>
             </div>
             
             <ul className="space-y-4 mb-8 text-gray-700 flex-1 text-left">

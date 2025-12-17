@@ -31,7 +31,7 @@ export default function LoginPage() {
     } else {
       // Si entra, buscamos cuál es su restaurante
       // (Por ahora lo mandamos al home, luego haremos el redireccionamiento inteligente)
-      router.push('/') 
+      router.push('/dashboard') 
       router.refresh()
     }
   }

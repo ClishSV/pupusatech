@@ -136,10 +136,17 @@ export default function MenuManagerPage() {
                   <div className="p-4">
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-3 flex-1">
-                        <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-4xl shadow-sm ${
-                          item.is_available ? 'bg-gradient-to-br from-orange-50 to-orange-100' : 'bg-gray-100'
-                        }`}>
-                          {item.image_url}
+                        {/* CONTENEDOR DE IMAGEN/EMOJI */}
+                        <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center shrink-0">
+                          {item.image_url && item.image_url.startsWith('/') ? (
+                            <img 
+                              src={item.image_url} 
+                              alt={item.name} 
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-2xl">{item.image_url || '🥘'}</span>
+                          )}
                         </div>
                         <div className="flex-1">
                           <h3 className="font-bold text-gray-900 text-base mb-1">{item.name}</h3>
@@ -248,10 +255,17 @@ export default function MenuManagerPage() {
                   <div className="p-4">
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-3 flex-1">
-                        <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-4xl shadow-sm ${
-                          item.is_available ? 'bg-gradient-to-br from-blue-50 to-cyan-100' : 'bg-gray-100'
-                        }`}>
-                          {item.image_url}
+                        {/* CONTENEDOR DE IMAGEN/EMOJI */}
+                        <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center shrink-0">
+                          {item.image_url && item.image_url.startsWith('/') ? (
+                            <img 
+                              src={item.image_url} 
+                              alt={item.name} 
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-2xl">{item.image_url || '🥘'}</span>
+                          )}
                         </div>
                         <div className="flex-1">
                           <h3 className="font-bold text-gray-900 text-base mb-1">{item.name}</h3>
