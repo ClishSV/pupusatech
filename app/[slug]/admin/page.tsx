@@ -10,13 +10,16 @@ export default function KitchenPage() {
   const params = useParams()
   const slug = params?.slug as string
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [orders, setOrders] = useState<any[]>([])
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [restaurant, setRestaurant] = useState<any>(null)
   
   const [audioEnabled, setAudioEnabled] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   // --- AGRUPACIÓN DE ITEMS ---
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const groupItems = (items: any[]) => {
     const grouped: Record<string, any> = {}
     items.forEach(item => {
@@ -50,6 +53,7 @@ export default function KitchenPage() {
   }
 
   // --- FUNCIÓN DE IMPRESIÓN TÉRMICA (TICKET) 🖨️ ---
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const printTicket = (order: any) => {
     const items = groupItems(order.items)
     
@@ -144,15 +148,33 @@ export default function KitchenPage() {
     fetchInitialData()
   }, [slug])
 
-  // --- ACTUALIZAR ESTADO (FLUJO SIMPLIFICADO) ---
+  // --- ACTUALIZAR ESTADO (AQUÍ ESTÁ LA MAGIA DE DESAPARECER) ---
   const updateStatus = async (orderId: string, newStatus: string) => {
+    // 1. UI Optimista (Lo que ve el usuario)
     if (newStatus === 'delivered' || newStatus === 'cancelled') {
+      // SI ES ENTREGADO O CANCELADO, LO BORRAMOS DE LA LISTA VISUAL INMEDIATAMENTE
       setOrders(prev => prev.filter(o => o.id !== orderId))
     } else {
+      // SI ES OTRO ESTADO (COCINANDO/LISTO), SOLO CAMBIAMOS EL COLOR
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o))
     }
 
-    await supabase.from('orders').update({ status: newStatus }).eq('id', orderId)
+    // 2. Base de datos (Lo que pasa por detrás)
+    // Nota: Si es 'delivered', el cliente también necesita recibir 'ready' antes o simultáneo para sonar.
+    // En el flujo de 2 toques: 
+    // Toque 1: pending -> cooking
+    // Toque 2: cooking -> ready (suena cliente) -> delivered (desaparece cocina)
+    
+    if (newStatus === 'delivered') {
+        // Truco: Primero marcamos ready (para que suene el cliente) y 2 segs después delivered (para archivar)
+        // Pero para la cocina, ya desapareció visualmente arriba.
+        await supabase.from('orders').update({ status: 'ready' }).eq('id', orderId)
+        setTimeout(async () => {
+            await supabase.from('orders').update({ status: 'delivered' }).eq('id', orderId)
+        }, 2000)
+    } else {
+        await supabase.from('orders').update({ status: newStatus }).eq('id', orderId)
+    }
   }
 
   const formatTime = (isoString: string) => {
@@ -160,7 +182,7 @@ export default function KitchenPage() {
   }
 
   if (!restaurant) return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="text-center">
         <div className="text-6xl mb-4 animate-bounce">👨‍🍳</div>
         <p className="text-xl text-gray-600 font-semibold">Cargando cocina...</p>
@@ -169,71 +191,63 @@ export default function KitchenPage() {
   )
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-orange-50 to-gray-50 p-4 relative">
+    <div className="min-h-screen bg-gray-100 p-4 relative font-sans">
       
-      {/* ==========================================
-          PANTALLA DE ACTIVACIÓN DE AUDIO
-          ========================================== */}
+      {/* PANTALLA DE BLOQUEO DE AUDIO */}
       {!audioEnabled && (
-        <div className="fixed inset-0 z-50 bg-gradient-to-br from-gray-900 via-gray-800 to-black backdrop-blur-sm flex flex-col items-center justify-center text-white p-4">
-          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-10 shadow-2xl text-center max-w-md">
-            <div className="text-7xl mb-6 animate-bounce">🔔</div>
-            <h2 className="text-3xl font-black mb-3 tracking-tight">Activar Notificaciones</h2>
-            <p className="text-gray-300 mb-8 text-sm">
-              Escucharás un sonido cada vez que llegue un nuevo pedido
-            </p>
-            <button 
-              onClick={enableAudio} 
-              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-4 px-10 rounded-2xl text-xl shadow-2xl transition-all transform hover:scale-105 active:scale-95 w-full"
-            >
-              🔊 INICIAR TURNO
-            </button>
-          </div>
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center text-white p-4">
+          <div className="text-6xl mb-6 animate-bounce">🔔</div>
+          <h2 className="text-3xl font-black mb-2 tracking-tight">Activar Notificaciones</h2>
+          <p className="text-gray-300 mb-8 text-sm max-w-xs text-center">
+            Escucharás un sonido cada vez que llegue un nuevo pedido
+          </p>
+          <button 
+            onClick={enableAudio} 
+            className="bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-10 rounded-2xl text-xl shadow-2xl transition-transform transform hover:scale-105 active:scale-95"
+          >
+            🔊 INICIAR TURNO
+          </button>
         </div>
       )}
 
-      {/* ==========================================
-          HEADER PROFESIONAL DE COCINA
-          ========================================== */}
-      <div className="bg-white p-5 rounded-2xl shadow-xl mb-6 flex flex-col sm:flex-row justify-between items-center border-l-4 border-orange-500 sticky top-4 z-10 gap-4 backdrop-blur-sm bg-white/95">
+      {/* HEADER COCINA */}
+      <div className="bg-white p-4 rounded-xl shadow-sm mb-6 flex flex-col sm:flex-row justify-between items-center border-l-8 border-orange-500 sticky top-4 z-10">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center text-2xl shadow-lg">
+          <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-3xl">
             👨‍🍳
           </div>
           <div>
-            <h1 className="text-2xl font-black text-gray-900 tracking-tight">{restaurant.name}</h1>
+            <h1 className="text-2xl font-black text-gray-800 tracking-tight">{restaurant.name}</h1>
             <div className="flex items-center gap-2 mt-1">
-              <span className="relative flex h-2.5 w-2.5">
+              <span className="relative flex h-3 w-3">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
               </span>
-              <p className="text-gray-500 text-sm font-semibold">Cocina en Vivo</p>
+              <p className="text-gray-500 text-sm font-medium">Cocina en Vivo</p>
             </div>
           </div>
         </div>
         
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => window.location.href = `/${slug}/admin/menu`}
-            className="bg-white border-2 border-gray-300 text-gray-700 px-4 py-2.5 rounded-xl font-bold hover:bg-gray-50 hover:border-gray-400 transition-all flex items-center gap-2 text-sm shadow-sm active:scale-95"
+        <div className="flex items-center gap-3 mt-4 sm:mt-0">
+          <a
+            href={`/${slug}/admin/menu`}
+            className="bg-white border-2 border-gray-200 text-gray-600 px-4 py-2 rounded-xl font-bold hover:bg-gray-50 hover:text-orange-600 transition-colors flex items-center gap-2 text-sm shadow-sm"
           >
             📝 Gestionar Menú
-          </button>
-          <div className="bg-gradient-to-br from-orange-500 to-red-500 text-white px-5 py-2.5 rounded-xl font-black shadow-lg text-xl min-w-[60px] text-center">
+          </a>
+          <div className="bg-orange-600 text-white px-5 py-2 rounded-xl font-black shadow-lg text-xl min-w-[60px] text-center">
             {orders.length}
           </div>
         </div>
       </div>
 
-      {/* ==========================================
-          ESTADO VACÍO MEJORADO
-          ========================================== */}
+      {/* GRILLA DE PEDIDOS */}
       {orders.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-[60vh] text-gray-400">
-          <div className="bg-white rounded-3xl p-12 shadow-xl text-center">
-            <div className="text-8xl mb-6">🍳</div>
-            <h3 className="text-2xl font-bold text-gray-700 mb-2">Todo tranquilo por aquí</h3>
-            <p className="text-gray-500">Los pedidos aparecerán automáticamente</p>
+          <div className="bg-white p-10 rounded-3xl shadow-sm border border-gray-200 text-center">
+            <div className="text-7xl mb-4 opacity-50">🍳</div>
+            <h3 className="text-xl font-bold text-gray-600 mb-1">Todo tranquilo por aquí</h3>
+            <p className="text-sm text-gray-400">Los pedidos aparecerán automáticamente</p>
           </div>
         </div>
       ) : (
@@ -241,59 +255,52 @@ export default function KitchenPage() {
           {orders.map((order) => (
             <div 
               key={order.id} 
-              className={`bg-white rounded-2xl shadow-lg overflow-hidden border-2 transition-all flex flex-col hover:shadow-2xl ${
+              className={`bg-white rounded-2xl shadow-md overflow-hidden border-2 transition-all flex flex-col hover:shadow-xl ${
                 order.status === 'pending' 
-                  ? 'border-gray-300 hover:border-gray-400' 
-                  : 'border-green-400 bg-gradient-to-br from-green-50 to-emerald-50 hover:border-green-500'
+                  ? 'border-gray-800' 
+                  : 'border-green-500' // Si está cooking es verde
               }`}
             >
-              {/* ==========================================
-                  CABECERA DE ORDEN
-                  ========================================== */}
+              {/* CABECERA DE TARJETA */}
               <div className={`p-4 text-white flex justify-between items-center ${
-                order.status === 'pending' 
-                  ? 'bg-gradient-to-r from-gray-700 to-gray-800' 
-                  : 'bg-gradient-to-r from-green-600 to-emerald-600'
+                 order.status === 'pending' ? 'bg-gray-900' : 'bg-green-600'
               }`}>
                 <div className="flex flex-col">
-                  <span className="font-black text-2xl tracking-tight">{order.table_number}</span>
-                  <span className="text-[11px] uppercase tracking-wider opacity-90 font-bold">
-                    {order.status === 'pending' ? '⏳ Por Confirmar' : '🔥 En Plancha'}
+                  <span className="font-black text-2xl tracking-tighter">{order.table_number}</span>
+                  <span className="text-[10px] uppercase font-bold tracking-widest opacity-80 flex items-center gap-1">
+                    {order.status === 'pending' ? '⏳ POR CONFIRMAR' : '🔥 EN PLANCHA'}
                   </span>
                 </div>
                 <div className="text-right">
-                  <div className="text-xs font-bold bg-black/20 px-3 py-1 rounded-full backdrop-blur-sm">
+                  <div className="text-xs font-bold bg-white/20 px-2 py-1 rounded backdrop-blur-sm">
                     {formatTime(order.created_at)}
                   </div>
                 </div>
               </div>
 
-              {/* ==========================================
-                  LISTA DE ITEMS MEJORADA
-                  ========================================== */}
-              <div className="p-4 space-y-2.5 flex-1 overflow-y-auto max-h-80">
+              {/* LISTA DE ITEMS */}
+              <div className="p-4 space-y-3 flex-1 overflow-y-auto max-h-80 bg-gray-50/50">
                 {groupItems(order.items).map((item: any, index: number) => (
-                  <div 
-                    key={index} 
-                    className="flex justify-between items-center p-3 rounded-xl bg-gradient-to-r from-white to-gray-50 border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
-                  >
+                  <div key={index} className="flex justify-between items-center p-3 rounded-xl bg-white border border-gray-100 shadow-sm">
                     <div className="flex items-center gap-3">
-                      <div className="bg-gradient-to-br from-orange-500 to-red-500 text-white w-9 h-9 flex items-center justify-center rounded-full font-black text-base shadow-md">
+                      <span className={`w-8 h-8 flex items-center justify-center rounded-full font-black text-sm shadow-sm ${
+                        order.status === 'pending' ? 'bg-gray-200 text-gray-700' : 'bg-orange-100 text-orange-600'
+                      }`}>
                         {item.quantity}
-                      </div>
+                      </span>
                       <div className="leading-tight">
-                        <p className="font-bold text-gray-900 text-sm">{item.name}</p>
+                        <p className="font-bold text-gray-800 text-sm">{item.name}</p>
                         <div className="flex gap-1 mt-1">
-                          {item.dough === 'maiz' && (
-                            <span className="inline-block bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded-md border border-yellow-200">
-                              🌽 MAÍZ
+                            {item.dough === 'maiz' && (
+                            <span className="inline-block bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded border border-yellow-200 uppercase tracking-wide">
+                                🌽 MAÍZ
                             </span>
-                          )}
-                          {item.dough === 'arroz' && (
-                            <span className="inline-block bg-white text-gray-700 text-[10px] font-bold px-2 py-0.5 rounded-md border border-gray-300 shadow-sm">
-                              🍚 ARROZ
+                            )}
+                            {item.dough === 'arroz' && (
+                            <span className="inline-block bg-white text-gray-600 text-[10px] font-bold px-2 py-0.5 rounded border border-gray-200 uppercase tracking-wide shadow-sm">
+                                🍚 ARROZ
                             </span>
-                          )}
+                            )}
                         </div>
                       </div>
                     </div>
@@ -301,48 +308,50 @@ export default function KitchenPage() {
                 ))}
               </div>
 
-              {/* ==========================================
-                  ACCIONES SIMPLIFICADAS
-                  ========================================== */}
-              <div className="p-4 bg-gray-50 border-t-2 border-gray-100 space-y-2.5">
+              {/* FOOTER ACCIONES */}
+              <div className="p-4 bg-white border-t border-gray-100 space-y-3">
                 
                 {/* ESTADO: PENDIENTE */}
                 {order.status === 'pending' && (
-                  <div className="grid grid-cols-2 gap-2.5">
+                  <div className="grid grid-cols-2 gap-3">
                     <button 
                       onClick={() => {
                         if(confirm('¿Rechazar este pedido?')) updateStatus(order.id, 'cancelled')
                       }}
-                      className="bg-red-50 border-2 border-red-200 text-red-600 font-bold py-3 rounded-xl hover:bg-red-100 hover:border-red-300 transition-all text-sm active:scale-95"
+                      className="bg-red-50 border-2 border-red-100 text-red-500 font-bold py-3 rounded-xl hover:bg-red-100 hover:border-red-200 transition-all text-xs uppercase tracking-wide"
                     >
-                      ❌ Rechazar
+                      ✕ Rechazar
                     </button>
                     <button 
                       onClick={() => {
                         updateStatus(order.id, 'cooking')
                       }}
-                      className="bg-gradient-to-r from-gray-800 to-black text-white font-bold py-3 rounded-xl hover:from-gray-900 hover:to-gray-800 shadow-lg transition-all text-sm active:scale-95"
+                      className="bg-gray-900 text-white font-bold py-3 rounded-xl hover:bg-black shadow-lg transition-all transform active:scale-95 text-xs uppercase tracking-wide flex items-center justify-center gap-2"
                     >
-                      🔥 A LA PLANCHA
+                      🔥 A la plancha
                     </button>
                   </div>
                 )}
 
-                {/* ESTADO: COCINANDO */}
+                {/* ESTADO: COCINANDO (2 TOQUES) */}
                 {order.status === 'cooking' && (
-                  <div className="flex flex-col gap-2.5">
+                  <div className="flex flex-col gap-3">
                     <button 
                       onClick={() => printTicket(order)}
-                      className="w-full bg-white border-2 border-gray-300 text-gray-700 font-bold py-2.5 rounded-xl hover:bg-gray-50 hover:border-gray-400 transition-all flex items-center justify-center gap-2 text-sm active:scale-95"
+                      className="w-full bg-white border-2 border-gray-200 text-gray-600 font-bold py-2.5 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wide"
                     >
                       🖨️ Imprimir Ticket
                     </button>
                     
+                    {/* ESTE BOTÓN HACE 2 COSAS: 
+                        1. Avisa al cliente (Ready) 
+                        2. Desaparece de aquí (Delivered) - manejado en updateStatus 
+                    */}
                     <button 
                       onClick={() => updateStatus(order.id, 'delivered')}
-                      className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all transform active:scale-95 text-sm"
+                      className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-green-200 transition-all transform active:scale-95 text-xs uppercase tracking-wide flex items-center justify-center gap-2"
                     >
-                      ✅ ENTREGAR Y ARCHIVAR
+                      ✅ Entregar y Archivar
                     </button>
                   </div>
                 )}
