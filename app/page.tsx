@@ -1,14 +1,14 @@
 "use client"
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Check, ChevronRight, Smartphone, ChefHat, TrendingUp, Zap, DollarSign, Users, Menu, X, Bell, Sparkles } from 'lucide-react';
+import { Check, ChevronRight, Smartphone, ChefHat, TrendingUp, Zap, DollarSign, Users, Menu, X, Bell, Sparkles, Star } from 'lucide-react';
 
 export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [visibleSections, setVisibleSections] = useState(new Set());
+  const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
   
-  const observerRef = useRef(null);
+  const observerRef = useRef<IntersectionObserver | undefined>(undefined);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -35,7 +35,7 @@ export default function LandingPage() {
     };
   }, []);
 
-  const handleNavClick = (e, href) => {
+  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
     e.preventDefault();
     const element = document.querySelector(href);
     if (element) {
@@ -47,7 +47,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white font-sans text-gray-800 overflow-x-hidden">
       
-      {/* NAVBAR MEJORADO */}
+      {/* NAVBAR PREMIUM */}
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
         scrolled 
           ? 'bg-white/98 backdrop-blur-2xl shadow-2xl shadow-orange-500/5 border-b border-orange-100' 
@@ -115,10 +115,9 @@ export default function LandingPage() {
         )}
       </nav>
 
-      {/* HERO SECTION MEJORADO */}
-      <header className="relative pt-32 pb-20 lg:pt-40 lg:pb-32 overflow-hidden">
+      {/* HERO SECTION PREMIUM */}
+      <header className="relative pt-32 pb-24 lg:pt-40 lg:pb-40 overflow-hidden bg-gradient-to-br from-orange-50 via-white to-red-50">
         <div className="absolute inset-0 -z-10">
-          <div className="absolute inset-0 bg-gradient-to-br from-orange-50 via-white to-red-50"></div>
           <div className="absolute top-20 right-0 w-[600px] h-[600px] bg-gradient-to-br from-orange-300 to-red-300 rounded-full blur-[150px] opacity-30 animate-blob"></div>
           <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-gradient-to-tr from-yellow-300 to-orange-300 rounded-full blur-[150px] opacity-25 animate-blob-delayed"></div>
           <div className="absolute top-1/2 left-1/2 w-[400px] h-[400px] bg-gradient-to-br from-pink-300 to-red-300 rounded-full blur-[150px] opacity-20 animate-blob-more-delayed"></div>
@@ -187,7 +186,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* TELÉFONO MEJORADO */}
+            {/* TELÉFONO PREMIUM */}
             <div className="relative flex justify-center lg:justify-end animate-fade-in-up" style={{animationDelay: '0.2s'}}>
               <div className="absolute inset-0 bg-gradient-to-r from-orange-400/40 to-red-400/40 rounded-full blur-[100px] animate-pulse-slow"></div>
               
@@ -244,12 +243,20 @@ export default function LandingPage() {
         </div>
       </header>
 
-      {/* CARACTERÍSTICAS MEJORADAS */}
-      <section id="beneficios" data-animate className="py-24 bg-gradient-to-b from-white to-gray-50 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-orange-50/50 to-transparent"></div>
+      {/* SEPARADOR ELEGANTE */}
+      <div className="h-px bg-gradient-to-r from-transparent via-orange-200 to-transparent"></div>
+
+      {/* CARACTERÍSTICAS PREMIUM */}
+      <section id="beneficios" data-animate className="py-32 bg-white relative overflow-hidden">
+        {/* Grid de fondo decorativo */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#f0f0f0_1px,transparent_1px),linear-gradient(to_bottom,#f0f0f0_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)] opacity-30"></div>
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center mb-20">
+            <div className="inline-flex items-center gap-2 bg-orange-100 border border-orange-200 px-5 py-2 rounded-full text-sm font-bold text-orange-700 mb-6">
+              <Star size={16} className="fill-orange-500 text-orange-500" />
+              Funcionalidades
+            </div>
             <h2 className="text-4xl lg:text-6xl font-black mb-6 tracking-tight bg-gradient-to-r from-gray-900 via-orange-800 to-gray-900 bg-clip-text text-transparent">
               Todo lo que necesitas
             </h2>
@@ -294,44 +301,50 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* DEMO CTA MEJORADO - DISEÑO LIMPIO */}
-      <section id="demo" data-animate className="py-32 relative overflow-hidden bg-gradient-to-b from-gray-50 via-orange-50/30 to-white">
-        {/* Elementos decorativos sutiles */}
-        <div className="absolute top-20 right-10 w-32 h-32 bg-orange-200 rounded-full blur-3xl opacity-20 animate-blob"></div>
-        <div className="absolute bottom-20 left-10 w-40 h-40 bg-red-200 rounded-full blur-3xl opacity-20 animate-blob-delayed"></div>
+      {/* SEPARADOR ELEGANTE */}
+      <div className="h-px bg-gradient-to-r from-transparent via-orange-200 to-transparent"></div>
+
+      {/* DEMO CTA PREMIUM */}
+      <section id="demo" data-animate className="py-32 relative overflow-hidden bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900">
+        {/* Patrón de fondo */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:4rem_4rem]"></div>
+        
+        {/* Elementos decorativos */}
+        <div className="absolute top-20 right-10 w-96 h-96 bg-orange-500 rounded-full blur-[150px] opacity-20 animate-blob"></div>
+        <div className="absolute bottom-20 left-10 w-96 h-96 bg-red-500 rounded-full blur-[150px] opacity-15 animate-blob-delayed"></div>
         
         <div className="max-w-7xl mx-auto px-4 text-center relative z-10">
           <div className="mb-6 inline-block">
-            <div className="inline-flex items-center gap-2 bg-orange-100 border border-orange-200 px-5 py-2 rounded-full text-sm font-bold text-orange-700">
+            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 px-5 py-2 rounded-full text-sm font-bold text-white">
               <Sparkles size={16} className="animate-pulse-subtle" />
               Demo Interactivo
             </div>
           </div>
           
-          <h2 className="text-4xl lg:text-6xl font-black mb-6 leading-tight bg-gradient-to-r from-gray-900 via-orange-800 to-gray-900 bg-clip-text text-transparent">
-            Pruébalo tú mismo <span className="text-orange-600">ahora</span>
+          <h2 className="text-4xl lg:text-6xl font-black mb-6 leading-tight text-white">
+            Pruébalo tú mismo <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-400">ahora</span>
           </h2>
           
-          <p className="text-xl text-gray-600 mb-16 max-w-3xl mx-auto leading-relaxed">
-            Experimenta con nuestra pupusería de demostración <span className="font-bold text-orange-600">'La Bendición'</span> y descubre cómo funcionará el sistema en tu local.
+          <p className="text-xl text-gray-300 mb-16 max-w-3xl mx-auto leading-relaxed">
+            Experimenta con nuestra pupusería de demostración <span className="font-bold text-orange-400">'La Bendición'</span> y descubre cómo funcionará el sistema en tu local.
           </p>
 
           <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
             <a 
               href="/labendicion" 
-              className="group relative bg-white border-2 border-orange-200 p-10 rounded-3xl hover:border-orange-400 hover:shadow-2xl hover:shadow-orange-500/20 hover:-translate-y-2 transition-all duration-500 overflow-hidden"
+              className="group relative bg-white/5 backdrop-blur-xl border-2 border-white/10 p-10 rounded-3xl hover:bg-white/10 hover:border-orange-400/50 hover:-translate-y-2 transition-all duration-500 overflow-hidden"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-orange-50 to-red-50 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+              <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
               
               <div className="relative">
-                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl flex items-center justify-center text-4xl shadow-lg group-hover:scale-110 group-hover:rotate-6 transition-all duration-500">
+                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl flex items-center justify-center text-4xl shadow-2xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500">
                   📱
                 </div>
-                <h3 className="text-3xl font-black text-gray-900 mb-4 group-hover:text-orange-600 transition-colors">Experiencia Cliente</h3>
-                <p className="text-gray-600 text-lg leading-relaxed mb-6">
+                <h3 className="text-3xl font-black text-white mb-4 group-hover:text-orange-400 transition-colors">Experiencia Cliente</h3>
+                <p className="text-gray-300 text-lg leading-relaxed mb-6">
                   Navega el menú, agrega productos y realiza un pedido como lo harían tus clientes.
                 </p>
-                <div className="flex items-center justify-center gap-2 text-orange-600 font-bold group-hover:gap-4 transition-all">
+                <div className="flex items-center justify-center gap-2 text-orange-400 font-bold group-hover:gap-4 transition-all">
                   Explorar ahora
                   <ChevronRight className="group-hover:translate-x-1 transition-transform" size={20} />
                 </div>
@@ -340,19 +353,19 @@ export default function LandingPage() {
             
             <a 
               href="/labendicion/admin" 
-              className="group relative bg-white border-2 border-blue-200 p-10 rounded-3xl hover:border-blue-400 hover:shadow-2xl hover:shadow-blue-500/20 hover:-translate-y-2 transition-all duration-500 overflow-hidden"
+              className="group relative bg-white/5 backdrop-blur-xl border-2 border-white/10 p-10 rounded-3xl hover:bg-white/10 hover:border-blue-400/50 hover:-translate-y-2 transition-all duration-500 overflow-hidden"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-cyan-50 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
               
               <div className="relative">
-                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center text-4xl shadow-lg group-hover:scale-110 group-hover:rotate-6 transition-all duration-500">
+                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center text-4xl shadow-2xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500">
                   👨‍🍳
                 </div>
-                <h3 className="text-3xl font-black text-gray-900 mb-4 group-hover:text-blue-600 transition-colors">Panel de Cocina</h3>
-                <p className="text-gray-600 text-lg leading-relaxed mb-6">
+                <h3 className="text-3xl font-black text-white mb-4 group-hover:text-blue-400 transition-colors">Panel de Cocina</h3>
+                <p className="text-gray-300 text-lg leading-relaxed mb-6">
                   Administra pedidos, controla el inventario y gestiona tu negocio en tiempo real.
                 </p>
-                <div className="flex items-center justify-center gap-2 text-blue-600 font-bold group-hover:gap-4 transition-all">
+                <div className="flex items-center justify-center gap-2 text-blue-400 font-bold group-hover:gap-4 transition-all">
                   Ver panel
                   <ChevronRight className="group-hover:translate-x-1 transition-transform" size={20} />
                 </div>
@@ -360,15 +373,26 @@ export default function LandingPage() {
             </a>
           </div>
           
-          <p className="mt-12 text-sm text-gray-500 max-w-2xl mx-auto">
-            💡 <span className="font-semibold">Tip:</span> Abre ambas vistas en pestañas diferentes para ver cómo los pedidos fluyen del cliente a la cocina en tiempo real.
+          <p className="mt-12 text-sm text-gray-400 max-w-2xl mx-auto">
+            💡 <span className="font-semibold text-white">Tip:</span> Abre ambas vistas en pestañas diferentes para ver cómo los pedidos fluyen del cliente a la cocina en tiempo real.
           </p>
         </div>
       </section>
 
-      {/* PRECIOS MEJORADOS */}
-      <section id="precios" data-animate className="py-32 bg-gradient-to-b from-gray-50 to-white relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 text-center mb-20">
+      {/* SEPARADOR ELEGANTE */}
+      <div className="h-px bg-gradient-to-r from-transparent via-orange-200 to-transparent"></div>
+
+      {/* PRECIOS PREMIUM */}
+      <section id="precios" data-animate className="py-32 bg-gradient-to-b from-gray-50 via-white to-gray-50 relative overflow-hidden">
+        {/* Decoración de fondo */}
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-orange-100 rounded-full blur-[150px] opacity-30"></div>
+        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-red-100 rounded-full blur-[150px] opacity-30"></div>
+        
+        <div className="max-w-7xl mx-auto px-4 text-center mb-20 relative z-10">
+          <div className="inline-flex items-center gap-2 bg-orange-100 border border-orange-200 px-5 py-2 rounded-full text-sm font-bold text-orange-700 mb-6">
+            <DollarSign size={16} />
+            Inversión
+          </div>
           <h2 className="text-4xl lg:text-6xl font-black mb-6 tracking-tight bg-gradient-to-r from-gray-900 via-orange-800 to-gray-900 bg-clip-text text-transparent">
             Precios Claros
           </h2>
@@ -377,7 +401,7 @@ export default function LandingPage() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto px-4">
+        <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto px-4 relative z-10">
           
           {/* Plan Emprendedor */}
           <div className="bg-white p-10 rounded-3xl shadow-lg border-2 border-gray-200 flex flex-col hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 relative overflow-hidden group">
@@ -444,11 +468,28 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* FOOTER */}
-      <footer className="bg-gray-900 text-gray-400 py-12 border-t border-gray-800 relative overflow-hidden">
+      {/* SEPARADOR ELEGANTE */}
+      <div className="h-px bg-gradient-to-r from-transparent via-orange-200 to-transparent"></div>
+
+      {/* FOOTER PREMIUM */}
+      <footer className="bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900 text-gray-400 py-16 border-t border-gray-800 relative overflow-hidden">
+        {/* Patrón de fondo */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:4rem_4rem]"></div>
         <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-red-500/5"></div>
+        
         <div className="max-w-7xl mx-auto px-4 text-center relative z-10">
-          <p className="font-medium">© {new Date().getFullYear()} PupusaTech. Hecho con ❤️ en El Salvador 🇸🇻</p>
+          <div className="mb-6">
+            <div className="inline-flex items-center gap-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl flex items-center justify-center text-2xl shadow-xl">
+                🫓
+              </div>
+              <span className="font-black text-2xl tracking-tight text-white">
+                PUPUSA<span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-400">TECH</span>
+              </span>
+            </div>
+          </div>
+          <p className="font-medium text-gray-400">© {new Date().getFullYear()} PupusaTech. Hecho con ❤️ en El Salvador 🇸🇻</p>
+          <p className="text-sm text-gray-500 mt-2">Revolucionando las pupuserías, un pedido a la vez.</p>
         </div>
       </footer>
 
