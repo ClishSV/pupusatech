@@ -10,16 +10,13 @@ export default function KitchenPage() {
   const params = useParams()
   const slug = params?.slug as string
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [orders, setOrders] = useState<any[]>([])
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [restaurant, setRestaurant] = useState<any>(null)
   
   const [audioEnabled, setAudioEnabled] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   // --- AGRUPACIÓN DE ITEMS ---
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const groupItems = (items: any[]) => {
     const grouped: Record<string, any> = {}
     items.forEach(item => {
@@ -53,7 +50,6 @@ export default function KitchenPage() {
   }
 
   // --- FUNCIÓN DE IMPRESIÓN TÉRMICA (TICKET) 🖨️ ---
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const printTicket = (order: any) => {
     const items = groupItems(order.items)
     
@@ -148,26 +144,15 @@ export default function KitchenPage() {
     fetchInitialData()
   }, [slug])
 
-  // --- ACTUALIZAR ESTADO (AQUÍ ESTÁ LA MAGIA DE DESAPARECER) ---
+  // --- ACTUALIZAR ESTADO ---
   const updateStatus = async (orderId: string, newStatus: string) => {
-    // 1. UI Optimista (Lo que ve el usuario)
     if (newStatus === 'delivered' || newStatus === 'cancelled') {
-      // SI ES ENTREGADO O CANCELADO, LO BORRAMOS DE LA LISTA VISUAL INMEDIATAMENTE
       setOrders(prev => prev.filter(o => o.id !== orderId))
     } else {
-      // SI ES OTRO ESTADO (COCINANDO/LISTO), SOLO CAMBIAMOS EL COLOR
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o))
     }
-
-    // 2. Base de datos (Lo que pasa por detrás)
-    // Nota: Si es 'delivered', el cliente también necesita recibir 'ready' antes o simultáneo para sonar.
-    // En el flujo de 2 toques: 
-    // Toque 1: pending -> cooking
-    // Toque 2: cooking -> ready (suena cliente) -> delivered (desaparece cocina)
     
     if (newStatus === 'delivered') {
-        // Truco: Primero marcamos ready (para que suene el cliente) y 2 segs después delivered (para archivar)
-        // Pero para la cocina, ya desapareció visualmente arriba.
         await supabase.from('orders').update({ status: 'ready' }).eq('id', orderId)
         setTimeout(async () => {
             await supabase.from('orders').update({ status: 'delivered' }).eq('id', orderId)
@@ -182,174 +167,216 @@ export default function KitchenPage() {
   }
 
   if (!restaurant) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
       <div className="text-center">
-        <div className="text-6xl mb-4 animate-bounce">👨‍🍳</div>
-        <p className="text-xl text-gray-600 font-semibold">Cargando cocina...</p>
+        <div className="text-7xl mb-4 animate-bounce">👨‍🍳</div>
+        <p className="text-2xl text-gray-700 font-bold">Cargando cocina...</p>
       </div>
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 relative font-sans">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-orange-50/30 to-gray-50 p-4 relative">
       
-      {/* PANTALLA DE BLOQUEO DE AUDIO */}
+      {/* ==========================================
+          PANTALLA DE ACTIVACIÓN (MEJORADA)
+          ========================================== */}
       {!audioEnabled && (
-        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center text-white p-4">
-          <div className="text-6xl mb-6 animate-bounce">🔔</div>
-          <h2 className="text-3xl font-black mb-2 tracking-tight">Activar Notificaciones</h2>
-          <p className="text-gray-300 mb-8 text-sm max-w-xs text-center">
-            Escucharás un sonido cada vez que llegue un nuevo pedido
-          </p>
-          <button 
-            onClick={enableAudio} 
-            className="bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-10 rounded-2xl text-xl shadow-2xl transition-transform transform hover:scale-105 active:scale-95"
-          >
-            🔊 INICIAR TURNO
-          </button>
+        <div className="fixed inset-0 z-50 bg-gradient-to-br from-gray-900 via-gray-800 to-black backdrop-blur-sm flex flex-col items-center justify-center text-white p-4">
+          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-12 shadow-2xl text-center max-w-md">
+            <div className="text-8xl mb-6 animate-bounce">🔔</div>
+            <h2 className="text-4xl font-black mb-4 tracking-tight">Activar Notificaciones</h2>
+            <p className="text-gray-300 mb-10 text-base leading-relaxed">
+              Escucharás un sonido cada vez que llegue un nuevo pedido a la cocina
+            </p>
+            <button 
+              onClick={enableAudio} 
+              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-black py-5 px-12 rounded-2xl text-2xl shadow-2xl transition-all transform hover:scale-105 active:scale-95 w-full"
+            >
+              🔊 INICIAR TURNO
+            </button>
+          </div>
         </div>
       )}
 
-      {/* HEADER COCINA */}
-      <div className="bg-white p-4 rounded-xl shadow-sm mb-6 flex flex-col sm:flex-row justify-between items-center border-l-8 border-orange-500 sticky top-4 z-10">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-3xl">
-            👨‍🍳
-          </div>
-          <div>
-            <h1 className="text-2xl font-black text-gray-800 tracking-tight">{restaurant.name}</h1>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-              </span>
-              <p className="text-gray-500 text-sm font-medium">Cocina en Vivo</p>
+      {/* ==========================================
+          HEADER PREMIUM
+          ========================================== */}
+      <div className="bg-white rounded-2xl shadow-xl mb-6 sticky top-4 z-10 overflow-hidden">
+        <div className="h-2 bg-gradient-to-r from-orange-500 via-red-500 to-pink-500"></div>
+        
+        <div className="p-5 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl flex items-center justify-center text-3xl shadow-lg">
+              👨‍🍳
+            </div>
+            <div>
+              <h1 className="text-2xl font-black text-gray-900 tracking-tight">{restaurant.name}</h1>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                </span>
+                <p className="text-gray-600 text-sm font-semibold">Cocina en Vivo</p>
+              </div>
             </div>
           </div>
-        </div>
-        
-        <div className="flex items-center gap-3 mt-4 sm:mt-0">
-          <a
-            href={`/${slug}/admin/menu`}
-            className="bg-white border-2 border-gray-200 text-gray-600 px-4 py-2 rounded-xl font-bold hover:bg-gray-50 hover:text-orange-600 transition-colors flex items-center gap-2 text-sm shadow-sm"
-          >
-            📝 Gestionar Menú
-          </a>
-          <div className="bg-orange-600 text-white px-5 py-2 rounded-xl font-black shadow-lg text-xl min-w-[60px] text-center">
-            {orders.length}
+          
+          <div className="flex items-center gap-3">
+            <a
+              href={`/${slug}/admin/menu`}
+              className="bg-white border-2 border-gray-300 text-gray-700 px-5 py-2.5 rounded-xl font-bold hover:bg-gray-50 hover:border-orange-500 hover:text-orange-600 transition-all flex items-center gap-2 text-sm shadow-sm active:scale-95"
+            >
+              📝 Gestionar Menú
+            </a>
+            <div className="bg-gradient-to-br from-orange-500 to-red-500 text-white px-6 py-2.5 rounded-xl font-black shadow-lg text-2xl min-w-[70px] text-center">
+              {orders.length}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* GRILLA DE PEDIDOS */}
+      {/* ==========================================
+          ESTADO VACÍO (MEJORADO)
+          ========================================== */}
       {orders.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-[60vh] text-gray-400">
-          <div className="bg-white p-10 rounded-3xl shadow-sm border border-gray-200 text-center">
-            <div className="text-7xl mb-4 opacity-50">🍳</div>
-            <h3 className="text-xl font-bold text-gray-600 mb-1">Todo tranquilo por aquí</h3>
-            <p className="text-sm text-gray-400">Los pedidos aparecerán automáticamente</p>
+        <div className="flex flex-col items-center justify-center h-[70vh]">
+          <div className="bg-white p-16 rounded-3xl shadow-2xl border-2 border-gray-100 text-center max-w-lg">
+            <div className="text-9xl mb-6 opacity-40">🍳</div>
+            <h3 className="text-3xl font-black text-gray-800 mb-3">Todo bajo control</h3>
+            <p className="text-gray-500 text-lg">Los pedidos aparecerán aquí automáticamente</p>
+            <div className="mt-8 flex items-center justify-center gap-2 text-sm text-gray-400">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+              </span>
+              <span className="font-semibold">Sistema activo</span>
+            </div>
           </div>
         </div>
       ) : (
+        /* ==========================================
+            GRILLA DE ÓRDENES (MEJORADA)
+            ========================================== */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {orders.map((order) => (
             <div 
               key={order.id} 
-              className={`bg-white rounded-2xl shadow-md overflow-hidden border-2 transition-all flex flex-col hover:shadow-xl ${
+              className={`bg-white rounded-2xl shadow-lg overflow-hidden border-2 transition-all flex flex-col hover:shadow-2xl hover:scale-[1.02] ${
                 order.status === 'pending' 
-                  ? 'border-gray-800' 
-                  : 'border-green-500' // Si está cooking es verde
+                  ? 'border-gray-400' 
+                  : 'border-green-400 bg-gradient-to-br from-green-50 to-emerald-50'
               }`}
             >
-              {/* CABECERA DE TARJETA */}
-              <div className={`p-4 text-white flex justify-between items-center ${
-                 order.status === 'pending' ? 'bg-gray-900' : 'bg-green-600'
+              {/* ==========================================
+                  HEADER DE ORDEN
+                  ========================================== */}
+              <div className={`p-4 text-white flex justify-between items-center relative overflow-hidden ${
+                 order.status === 'pending' 
+                   ? 'bg-gradient-to-r from-gray-800 to-gray-900' 
+                   : 'bg-gradient-to-r from-green-600 to-emerald-600'
               }`}>
-                <div className="flex flex-col">
-                  <span className="font-black text-2xl tracking-tighter">{order.table_number}</span>
-                  <span className="text-[10px] uppercase font-bold tracking-widest opacity-80 flex items-center gap-1">
-                    {order.status === 'pending' ? '⏳ POR CONFIRMAR' : '🔥 EN PLANCHA'}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+                
+                <div className="relative z-10 flex flex-col">
+                  <span className="font-black text-3xl tracking-tight">{order.table_number}</span>
+                  <span className="text-[10px] uppercase font-black tracking-widest opacity-90 flex items-center gap-1.5 mt-1">
+                    {order.status === 'pending' ? (
+                      <>
+                        <span className="animate-pulse">⏳</span> POR CONFIRMAR
+                      </>
+                    ) : (
+                      <>
+                        <span className="animate-bounce">🔥</span> EN PLANCHA
+                      </>
+                    )}
                   </span>
                 </div>
-                <div className="text-right">
-                  <div className="text-xs font-bold bg-white/20 px-2 py-1 rounded backdrop-blur-sm">
+                
+                <div className="relative z-10 text-right">
+                  <div className="text-xs font-bold bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-lg shadow-sm">
                     {formatTime(order.created_at)}
+                  </div>
+                  <div className="text-[10px] mt-1 opacity-75 font-semibold">
+                    ${order.total.toFixed(2)}
                   </div>
                 </div>
               </div>
 
-              {/* LISTA DE ITEMS */}
-              <div className="p-4 space-y-3 flex-1 overflow-y-auto max-h-80 bg-gray-50/50">
+              {/* ==========================================
+                  LISTA DE ITEMS (MEJORADA)
+                  ========================================== */}
+              <div className="p-4 space-y-2.5 flex-1 overflow-y-auto max-h-80">
                 {groupItems(order.items).map((item: any, index: number) => (
-                  <div key={index} className="flex justify-between items-center p-3 rounded-xl bg-white border border-gray-100 shadow-sm">
-                    <div className="flex items-center gap-3">
-                      <span className={`w-8 h-8 flex items-center justify-center rounded-full font-black text-sm shadow-sm ${
-                        order.status === 'pending' ? 'bg-gray-200 text-gray-700' : 'bg-orange-100 text-orange-600'
-                      }`}>
-                        {item.quantity}
-                      </span>
-                      <div className="leading-tight">
-                        <p className="font-bold text-gray-800 text-sm">{item.name}</p>
-                        <div className="flex gap-1 mt-1">
-                            {item.dough === 'maiz' && (
-                            <span className="inline-block bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-0.5 rounded border border-yellow-200 uppercase tracking-wide">
-                                🌽 MAÍZ
-                            </span>
-                            )}
-                            {item.dough === 'arroz' && (
-                            <span className="inline-block bg-white text-gray-600 text-[10px] font-bold px-2 py-0.5 rounded border border-gray-200 uppercase tracking-wide shadow-sm">
-                                🍚 ARROZ
-                            </span>
-                            )}
-                        </div>
+                  <div 
+                    key={index} 
+                    className="flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-100 shadow-sm hover:shadow-md transition-shadow"
+                  >
+                    <div className={`w-10 h-10 flex items-center justify-center rounded-full font-black text-base shadow-md ${
+                      order.status === 'pending' 
+                        ? 'bg-gray-200 text-gray-700' 
+                        : 'bg-gradient-to-br from-orange-500 to-red-500 text-white'
+                    }`}>
+                      {item.quantity}
+                    </div>
+                    
+                    <div className="flex-1 leading-tight">
+                      <p className="font-bold text-gray-900 text-sm">{item.name}</p>
+                      <div className="flex gap-1.5 mt-1.5">
+                        {item.dough === 'maiz' && (
+                          <span className="inline-block bg-yellow-100 text-yellow-800 text-[10px] font-black px-2 py-0.5 rounded-md border border-yellow-200 uppercase tracking-wide">
+                            🌽 MAÍZ
+                          </span>
+                        )}
+                        {item.dough === 'arroz' && (
+                          <span className="inline-block bg-white text-gray-700 text-[10px] font-black px-2 py-0.5 rounded-md border border-gray-300 uppercase tracking-wide shadow-sm">
+                            🍚 ARROZ
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* FOOTER ACCIONES */}
-              <div className="p-4 bg-white border-t border-gray-100 space-y-3">
+              {/* ==========================================
+                  FOOTER DE ACCIONES (MEJORADO)
+                  ========================================== */}
+              <div className="p-4 bg-gray-50 border-t-2 border-gray-100 space-y-2.5">
                 
                 {/* ESTADO: PENDIENTE */}
                 {order.status === 'pending' && (
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-2.5">
                     <button 
                       onClick={() => {
                         if(confirm('¿Rechazar este pedido?')) updateStatus(order.id, 'cancelled')
                       }}
-                      className="bg-red-50 border-2 border-red-100 text-red-500 font-bold py-3 rounded-xl hover:bg-red-100 hover:border-red-200 transition-all text-xs uppercase tracking-wide"
+                      className="bg-red-50 border-2 border-red-200 text-red-600 font-bold py-3 rounded-xl hover:bg-red-100 hover:border-red-300 transition-all text-xs uppercase tracking-wide active:scale-95"
                     >
                       ✕ Rechazar
                     </button>
                     <button 
-                      onClick={() => {
-                        updateStatus(order.id, 'cooking')
-                      }}
-                      className="bg-gray-900 text-white font-bold py-3 rounded-xl hover:bg-black shadow-lg transition-all transform active:scale-95 text-xs uppercase tracking-wide flex items-center justify-center gap-2"
+                      onClick={() => updateStatus(order.id, 'cooking')}
+                      className="bg-gradient-to-r from-gray-800 to-black text-white font-bold py-3 rounded-xl hover:from-gray-900 hover:to-gray-800 shadow-lg transition-all transform active:scale-95 text-xs uppercase tracking-wide flex items-center justify-center gap-2"
                     >
                       🔥 A la plancha
                     </button>
                   </div>
                 )}
 
-                {/* ESTADO: COCINANDO (2 TOQUES) */}
+                {/* ESTADO: COCINANDO */}
                 {order.status === 'cooking' && (
-                  <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-2.5">
                     <button 
                       onClick={() => printTicket(order)}
-                      className="w-full bg-white border-2 border-gray-200 text-gray-600 font-bold py-2.5 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wide"
+                      className="w-full bg-white border-2 border-gray-300 text-gray-700 font-bold py-2.5 rounded-xl hover:bg-gray-50 hover:border-gray-400 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wide active:scale-95"
                     >
                       🖨️ Imprimir Ticket
                     </button>
                     
-                    {/* ESTE BOTÓN HACE 2 COSAS: 
-                        1. Avisa al cliente (Ready) 
-                        2. Desaparece de aquí (Delivered) - manejado en updateStatus 
-                    */}
                     <button 
                       onClick={() => updateStatus(order.id, 'delivered')}
-                      className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-green-200 transition-all transform active:scale-95 text-xs uppercase tracking-wide flex items-center justify-center gap-2"
+                      className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-black py-4 rounded-xl shadow-lg shadow-green-200 transition-all transform active:scale-95 text-sm uppercase tracking-wide flex items-center justify-center gap-2"
                     >
                       ✅ Entregar y Archivar
                     </button>
