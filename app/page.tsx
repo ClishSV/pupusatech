@@ -55,16 +55,21 @@ export default function LandingPage() {
       }`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
+            {/* Logo con Imagen Real */}
             <div className="flex items-center gap-3 group cursor-pointer">
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-orange-400 to-red-400 rounded-2xl blur-lg opacity-0 group-hover:opacity-70 transition-opacity duration-300"></div>
-                <div className="relative w-12 h-12 bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl flex items-center justify-center text-2xl shadow-xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
-                  🫓
-                </div>
-              </div>
-              <span className="font-black text-2xl tracking-tight">
-                PUPUSA<span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-red-600">TECH</span>
-              </span>
+              {/* Versión Móvil (Solo ícono) */}
+              <img 
+                src="/logo-icon.png" 
+                alt="PupusaTech Logo" 
+                className="h-10 w-auto lg:hidden group-hover:scale-110 transition-transform" 
+              />
+              
+              {/* Versión Escritorio (Logo Completo) */}
+              <img 
+                src="/logo-full.png" 
+                alt="PupusaTech Logo Completo" 
+                className="hidden lg:block h-12 w-auto group-hover:opacity-90 transition-opacity" 
+              />
             </div>
 
             <div className="hidden lg:flex items-center gap-8 text-sm font-bold">
@@ -479,13 +484,21 @@ export default function LandingPage() {
         
         <div className="max-w-7xl mx-auto px-4 text-center relative z-10">
           <div className="mb-6">
-            <div className="inline-flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl flex items-center justify-center text-2xl shadow-xl">
-                🫓
-              </div>
-              <span className="font-black text-2xl tracking-tight text-white">
-                PUPUSA<span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-400">TECH</span>
-              </span>
+            {/* Logo con Imagen Real */}
+            <div className="flex items-center gap-3 group cursor-pointer">
+              {/* Versión Móvil (Solo ícono) */}
+              <img 
+                src="/logo-icon.png" 
+                alt="PupusaTech Logo" 
+                className="h-10 w-auto lg:hidden group-hover:scale-110 transition-transform" 
+              />
+              
+              {/* Versión Escritorio (Logo Completo) */}
+              <img 
+                src="/logo-fullw.png" 
+                alt="PupusaTech Logo Completo" 
+                className="hidden lg:block h-12 w-auto group-hover:opacity-90 transition-opacity" 
+              />
             </div>
           </div>
           <p className="font-medium text-gray-400">© {new Date().getFullYear()} PupusaTech. Hecho con ❤️ en El Salvador 🇸🇻</p>

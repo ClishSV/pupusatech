@@ -40,9 +40,11 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md border border-gray-100">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-orange-100 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">
-            🫓
-          </div>
+          <img 
+            src="/logo-icon.png" 
+            alt="PupusaTech" 
+            className="w-24 h-24 mx-auto mb-4 drop-shadow-md hover:scale-105 transition-transform" 
+          />
           <h1 className="text-2xl font-black text-gray-900">Iniciar Sesión</h1>
           <p className="text-gray-500">Panel de Administración PupusaTech</p>
         </div>

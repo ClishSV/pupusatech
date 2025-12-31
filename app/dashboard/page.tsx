@@ -57,10 +57,13 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gray-50 font-sans text-gray-800">
       {/* NAVBAR DASHBOARD */}
       <nav className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center sticky top-0 z-10">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">🫓</span>
-          <span className="font-black text-xl tracking-tight text-gray-900">PUPUSA<span className="text-orange-600">TECH</span></span>
-          <span className="bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded-full ml-2">Panel Dueño</span>
+        <div className="flex items-center gap-3">
+          <img src="/logo-icon.png" alt="Logo" className="h-10 w-auto" />
+          
+          <div className="flex flex-col leading-none">
+            <span className="font-black text-xl text-gray-900 tracking-tight">PUPUSA<span className="text-orange-600">TECH</span></span>
+            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Panel Dueño</span>
+          </div>
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-500 hidden sm:block">{user?.email}</span>
