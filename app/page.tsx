@@ -59,7 +59,7 @@ export default function LandingPage() {
             <div className="flex items-center gap-3 group cursor-pointer">
               {/* Versión Móvil (Solo ícono) */}
               <img 
-                src="/logo-icon.png" 
+                src="/logo-full.png" 
                 alt="PupusaTech Logo" 
                 className="h-10 w-auto lg:hidden group-hover:scale-110 transition-transform" 
               />
@@ -488,7 +488,7 @@ export default function LandingPage() {
             <div className="flex items-center gap-3 group cursor-pointer">
               {/* Versión Móvil (Solo ícono) */}
               <img 
-                src="/logo-icon.png" 
+                src="/logo-fullw.png" 
                 alt="PupusaTech Logo" 
                 className="h-10 w-auto lg:hidden group-hover:scale-110 transition-transform" 
               />
