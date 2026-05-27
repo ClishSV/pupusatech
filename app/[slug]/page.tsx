@@ -14,19 +14,19 @@ export default function MenuPage() {
   const params = useParams()
   const slug = params?.slug as string
 
-  // DATOS IMPORTANTES
+  // DATOS
  
   const [restaurant, setRestaurant] = useState<any>(null)
 
   const [menu, setMenu] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  // ESTADOS DE INTERFAZ DE APP
+  // ESTADOS DE INTERFAZ 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [selectedItem, setSelectedItem] = useState<any>(null)
   const [showModal, setShowModal] = useState(false)
   
-  // ESTADOS DE CHECKOUT DE APP
+  // ESTADOS DE CHECKOUT
   const [showCheckout, setShowCheckout] = useState(false)
   const [customerName, setCustomerName] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
