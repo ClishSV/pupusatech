@@ -1,7 +1,10 @@
 "use client"
 
+/* eslint-disable @next/next/no-img-element */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { useEffect, useState, useRef } from 'react'
-import { supabase } from '../../lib/supabase' 
+import { supabase } from '../../lib/supabase'
 import { useParams } from 'next/navigation'
 import { useCartStore } from '../../lib/store' 
 
@@ -12,9 +15,9 @@ export default function MenuPage() {
   const slug = params?.slug as string
 
   // DATOS
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
   const [restaurant, setRestaurant] = useState<any>(null)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   const [menu, setMenu] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -145,9 +148,9 @@ export default function MenuPage() {
     return Object.values(grouped)
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
   const increaseQuantity = (item: any) => addToCart({ cartId: crypto.randomUUID(), id: item.id, name: item.name, price: item.price, dough: item.dough })
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   const decreaseQuantity = (item: any) => { 
     const lastId = item.cartIds[item.cartIds.length - 1]
     if (lastId) removeFromCart(lastId)
@@ -384,7 +387,7 @@ export default function MenuPage() {
       {/* MENÚ CON DISEÑO MEJORADO */}
       <div className="max-w-2xl mx-auto p-5 space-y-8">
         {['pupusas', 'extras', 'bebidas', 'postres'].map(category => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        
           const items = menu.filter((item: any) => item.category === category)
           if (items.length === 0) return null
           
@@ -407,7 +410,7 @@ export default function MenuPage() {
               </div>
               
               <div className="grid gap-4">
-                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+               
                 {items.map((item: any) => (
                   <div 
                     key={item.id} 
@@ -606,7 +609,7 @@ export default function MenuPage() {
             <div className="p-6">
               {/* Lista de items */}
               <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-3xl mb-5 max-h-72 overflow-y-auto space-y-3 border-2 border-gray-200">
-                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+               
                 {getGroupedCart().map((group: any) => (
                   <div key={group.id + group.dough} className="bg-white p-4 rounded-2xl flex justify-between items-center shadow-md border border-gray-100">
                     <div className="flex flex-col flex-1">

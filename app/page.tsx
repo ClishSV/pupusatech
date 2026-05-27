@@ -1,4 +1,6 @@
 "use client"
+/* eslint-disable @next/next/no-img-element */
+/* eslint-disable @next/next/no-html-link-for-pages */
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Check, ChevronRight, Smartphone, ChefHat, TrendingUp, Zap, DollarSign, Users, Menu, X, Bell, Sparkles, Star } from 'lucide-react';
@@ -109,7 +111,7 @@ export default function LandingPage() {
               <a href="#beneficios" onClick={(e) => handleNavClick(e, '#beneficios')} className="block text-gray-700 font-semibold hover:text-orange-600 hover:translate-x-2 transition-all duration-300 py-2">Beneficios</a>
               <a href="#demo" onClick={(e) => handleNavClick(e, '#demo')} className="block text-gray-700 font-semibold hover:text-orange-600 hover:translate-x-2 transition-all duration-300 py-2">Demo</a>
               <a href="#precios" onClick={(e) => handleNavClick(e, '#precios')} className="block text-gray-700 font-semibold hover:text-orange-600 hover:translate-x-2 transition-all duration-300 py-2">Precios</a>
-              <a href="/login" className="block text-gray-900 font-bold hover:text-orange-600 hover:translate-x-2 transition-all duration-300 py-2 flex items-center gap-2">
+              <a href="/login" className=" text-gray-900 font-bold hover:text-orange-600 hover:translate-x-2 transition-all duration-300 py-2 flex items-center gap-2">
                 <Users size={16} /> Soy Cliente
               </a>
               <a href="https://wa.me/50373933442" className="block bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-3 rounded-xl text-center font-bold shadow-lg hover:scale-105 transition-all duration-300">
@@ -331,7 +333,7 @@ export default function LandingPage() {
           </h2>
           
           <p className="text-xl text-gray-300 mb-16 max-w-3xl mx-auto leading-relaxed">
-            Experimenta con nuestra pupusería de demostración <span className="font-bold text-orange-400">'La Bendición'</span> y descubre cómo funcionará el sistema en tu local.
+            Experimenta con nuestra pupusería de demostración <span className="font-bold text-orange-400">&apos;La Bendición&apos;</span> y descubre cómo funcionará el sistema en tu local.
           </p>
 
           <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
