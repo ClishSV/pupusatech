@@ -21,12 +21,12 @@ export default function MenuPage() {
   const [menu, setMenu] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  // ESTADOS DE INTERFAZ 
+  // ESTADOS DE INTERFAZ DE APP
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [selectedItem, setSelectedItem] = useState<any>(null)
   const [showModal, setShowModal] = useState(false)
   
-  // ESTADOS DE CHECKOUT
+  // ESTADOS DE CHECKOUT DE APP
   const [showCheckout, setShowCheckout] = useState(false)
   const [customerName, setCustomerName] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
