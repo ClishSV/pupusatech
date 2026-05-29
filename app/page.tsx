@@ -85,7 +85,7 @@ export default function LandingPage() {
 
             <div className="flex items-center gap-4">
               <a 
-                href="https://wa.me/50373933442?text=Hola..." 
+                href="https://wa.me/50373933442?text=Hola,%20me%20interesa%20digitalizar%20mi%20pupusería" 
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hidden sm:flex items-center gap-2 bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-3 rounded-full text-sm font-bold hover:from-orange-700 hover:to-red-700 transition-all duration-300 shadow-xl hover:shadow-orange-500/50 hover:scale-105 relative overflow-hidden group"
@@ -114,7 +114,7 @@ export default function LandingPage() {
               <a href="/login" className=" text-gray-900 font-bold hover:text-orange-600 hover:translate-x-2 transition-all duration-300 py-2 flex items-center gap-2">
                 <Users size={16} /> Soy Cliente
               </a>
-              <a href="https://wa.me/50373933442" className="block bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-3 rounded-xl text-center font-bold shadow-lg hover:scale-105 transition-all duration-300">
+              <a href="https://wa.me/50373933442?text=Hola,%20me%20interesa%20digitalizar%20mi%20pupusería" className="block bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-3 rounded-xl text-center font-bold shadow-lg hover:scale-105 transition-all duration-300">
                 Agendar Cita
               </a>
             </div>
@@ -311,7 +311,7 @@ export default function LandingPage() {
       {/* SEPARADOR ELEGANTE */}
       <div className="h-px bg-gradient-to-r from-transparent via-orange-200 to-transparent"></div>
 
-      {/* DEMO CTA PREMIUM */}
+      {/* DEMO CTA PREMIUM (ACTUALIZADA CON 3 TARJETAS) */}
       <section id="demo" data-animate className="py-32 relative overflow-hidden bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900">
         {/* Patrón de fondo */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:4rem_4rem]"></div>
@@ -324,7 +324,7 @@ export default function LandingPage() {
           <div className="mb-6 inline-block">
             <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 px-5 py-2 rounded-full text-sm font-bold text-white">
               <Sparkles size={16} className="animate-pulse-subtle" />
-              Demo Interactivo
+              Demo Interactivo 360°
             </div>
           </div>
           
@@ -333,47 +333,72 @@ export default function LandingPage() {
           </h2>
           
           <p className="text-xl text-gray-300 mb-16 max-w-3xl mx-auto leading-relaxed">
-            Experimenta con nuestra pupusería de demostración <span className="font-bold text-orange-400">&apos;La Bendición&apos;</span> y descubre cómo funcionará el sistema en tu local.
+            Experimenta con nuestra pupusería de demostración <span className="font-bold text-orange-400">&apos;La Bendición&apos;</span>. Descubre cómo fluyen los pedidos entre el cliente, el mesero y la cocina en tiempo real.
           </p>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
+            
+            {/* Demo Cliente */}
             <a 
               href="/labendicion" 
-              className="group relative bg-white/5 backdrop-blur-xl border-2 border-white/10 p-10 rounded-3xl hover:bg-white/10 hover:border-orange-400/50 hover:-translate-y-2 transition-all duration-500 overflow-hidden"
+              className="group relative bg-white/5 backdrop-blur-xl border-2 border-white/10 p-8 rounded-3xl hover:bg-white/10 hover:border-orange-400/50 hover:-translate-y-2 transition-all duration-500 overflow-hidden"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
               
               <div className="relative">
-                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl flex items-center justify-center text-4xl shadow-2xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500">
+                <div className="w-16 h-16 mx-auto mb-6 bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl flex items-center justify-center text-3xl shadow-2xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500">
                   📱
                 </div>
-                <h3 className="text-3xl font-black text-white mb-4 group-hover:text-orange-400 transition-colors">Experiencia Cliente</h3>
-                <p className="text-gray-300 text-lg leading-relaxed mb-6">
-                  Navega el menú, agrega productos y realiza un pedido como lo harían tus clientes.
+                <h3 className="text-2xl font-black text-white mb-4 group-hover:text-orange-400 transition-colors">Menú Cliente</h3>
+                <p className="text-gray-300 text-base leading-relaxed mb-6">
+                  El cliente escanea el QR, visualiza el menú, elige la masa y envía su pedido sin fricción.
                 </p>
                 <div className="flex items-center justify-center gap-2 text-orange-400 font-bold group-hover:gap-4 transition-all">
-                  Explorar ahora
+                  Probar Cliente
+                  <ChevronRight className="group-hover:translate-x-1 transition-transform" size={20} />
+                </div>
+              </div>
+            </a>
+
+            {/* Demo Mesero */}
+            <a 
+              href="/labendicion/mesero" 
+              className="group relative bg-white/5 backdrop-blur-xl border-2 border-white/10 p-8 rounded-3xl hover:bg-white/10 hover:border-purple-400/50 hover:-translate-y-2 transition-all duration-500 overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+              
+              <div className="relative">
+                <div className="w-16 h-16 mx-auto mb-6 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center text-3xl shadow-2xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500">
+                  🤵
+                </div>
+                <h3 className="text-2xl font-black text-white mb-4 group-hover:text-purple-400 transition-colors">Modo Mesero</h3>
+                <p className="text-gray-300 text-base leading-relaxed mb-6">
+                  Herramienta de alta velocidad. Selecciona mesa, anota el pedido en 2 clics y envíalo a cocina.
+                </p>
+                <div className="flex items-center justify-center gap-2 text-purple-400 font-bold group-hover:gap-4 transition-all">
+                  Probar Mesero
                   <ChevronRight className="group-hover:translate-x-1 transition-transform" size={20} />
                 </div>
               </div>
             </a>
             
+            {/* Demo Cocina */}
             <a 
               href="/labendicion/admin" 
-              className="group relative bg-white/5 backdrop-blur-xl border-2 border-white/10 p-10 rounded-3xl hover:bg-white/10 hover:border-blue-400/50 hover:-translate-y-2 transition-all duration-500 overflow-hidden"
+              className="group relative bg-white/5 backdrop-blur-xl border-2 border-white/10 p-8 rounded-3xl hover:bg-white/10 hover:border-blue-400/50 hover:-translate-y-2 transition-all duration-500 overflow-hidden"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
               
               <div className="relative">
-                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center text-4xl shadow-2xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500">
+                <div className="w-16 h-16 mx-auto mb-6 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center text-3xl shadow-2xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500">
                   👨‍🍳
                 </div>
-                <h3 className="text-3xl font-black text-white mb-4 group-hover:text-blue-400 transition-colors">Panel de Cocina</h3>
-                <p className="text-gray-300 text-lg leading-relaxed mb-6">
-                  Administra pedidos, controla el inventario y gestiona tu negocio en tiempo real.
+                <h3 className="text-2xl font-black text-white mb-4 group-hover:text-blue-400 transition-colors">Panel Cocina</h3>
+                <p className="text-gray-300 text-base leading-relaxed mb-6">
+                  Recibe las órdenes consolidadas con alerta sonora, marca el progreso e imprime el ticket.
                 </p>
                 <div className="flex items-center justify-center gap-2 text-blue-400 font-bold group-hover:gap-4 transition-all">
-                  Ver panel
+                  Ver Cocina
                   <ChevronRight className="group-hover:translate-x-1 transition-transform" size={20} />
                 </div>
               </div>
@@ -381,7 +406,7 @@ export default function LandingPage() {
           </div>
           
           <p className="mt-12 text-sm text-gray-400 max-w-2xl mx-auto">
-            💡 <span className="font-semibold text-white">Tip:</span> Abre ambas vistas en pestañas diferentes para ver cómo los pedidos fluyen del cliente a la cocina en tiempo real.
+            💡 <span className="font-semibold text-white">Súper Tip:</span> Abre las 3 vistas en pestañas diferentes o compártelas con un amigo para ver la sincronización en tiempo real.
           </p>
         </div>
       </section>
@@ -461,6 +486,7 @@ export default function LandingPage() {
               <ul className="space-y-4 mb-8 text-gray-700 flex-1 text-left">
                 <li className="flex gap-3 items-center"><Check size={18} className="text-orange-500 shrink-0"/> Todo lo del Plan Básico</li>
                 <li className="flex gap-3 items-center font-bold"><Check size={18} className="text-orange-500 shrink-0"/> Pantalla de Cocina (KDS)</li>
+                <li className="flex gap-3 items-center font-bold"><Check size={18} className="text-orange-500 shrink-0"/> Modo Mesero (POS Móvil)</li>
                 <li className="flex gap-3 items-center"><Check size={18} className="text-orange-500 shrink-0"/> Impresión de Tickets</li>
                 <li className="flex gap-3 items-center"><Check size={18} className="text-orange-500 shrink-0"/> Reportes de Ventas</li>
               </ul>
@@ -486,8 +512,8 @@ export default function LandingPage() {
         
         <div className="max-w-7xl mx-auto px-4 text-center relative z-10">
           <div className="mb-6">
-            {/* Logo con Imagen Real */}
-            <div className="flex items-center gap-3 group cursor-pointer">
+            {/* Logo con Imagen Real CENTRADO */}
+            <div className="flex items-center justify-center gap-3 group cursor-pointer">
               {/* Versión Móvil (Solo ícono) */}
               <img 
                 src="/logo-fullw.png" 
