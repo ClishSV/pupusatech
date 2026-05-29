@@ -140,38 +140,38 @@ export default function WaiterPage() {
       
       {/* TOAST DE ÉXITO FLOTANTE */}
       {showSuccessToast && (
-        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-[60] bg-green-600 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-bounce w-[90%] max-w-sm border-2 border-green-400">
-            <div className="text-4xl">✅</div>
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-[60] bg-green-600 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-bounce w-[90%] max-w-sm border-4 border-white">
+            <div className="text-5xl">✅</div>
             <div>
-                <p className="font-black text-lg">¡ENVIADO!</p>
-                <p className="text-sm text-green-100 font-medium line-clamp-1">{lastOrderTable}</p>
+                <p className="font-black text-2xl">¡ENVIADO!</p>
+                <p className="text-base text-green-100 font-medium line-clamp-1">{lastOrderTable}</p>
             </div>
         </div>
       )}
 
       {/* HEADER MESERO */}
-      <div className="sticky top-0 z-20 bg-gray-900 shadow-xl border-b border-gray-800 text-white">
+      <div className="sticky top-0 z-20 bg-gray-900 shadow-xl border-b-4 border-gray-800 text-white">
         <div className="max-w-md mx-auto px-4 py-3">
-            <div className="flex justify-between items-center mb-3">
+            <div className="flex justify-between items-center mb-4">
                 <div>
-                    <h1 className="font-bold text-lg leading-none">{restaurant.name}</h1>
-                    <p className="text-xs text-gray-400 mt-1 font-mono">PEDIDO EN MESA v1.0</p>
+                    <h1 className="font-black text-xl leading-none text-orange-400">{restaurant.name}</h1>
+                    <p className="text-xs text-gray-400 mt-1 font-mono tracking-widest">PEDIDO EN MESA v1.0</p>
                 </div>
-                <Link href={`/${slug}/admin`} className="bg-gray-800 border border-gray-700 p-2 rounded-lg text-xs hover:bg-gray-700 transition">
+                <Link href={`/${slug}/admin`} className="bg-gray-800 border border-gray-700 px-3 py-2 rounded-lg text-xs font-bold hover:bg-gray-700 transition shadow-sm">
                     Ir a Cocina 👨‍🍳
                 </Link>
             </div>
             
-            {/* SELECTOR DE MESA DINÁMICO */}
-            <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+            {/* SELECTOR DE MESA DINÁMICO (BOTONES MÁS GRANDES) */}
+            <div className="flex gap-2.5 overflow-x-auto pb-3 no-scrollbar">
                 {dynamicTables.map(mesa => (
                     <button
                         key={mesa}
                         onClick={() => setSelectedTable(mesa)}
-                        className={`flex-shrink-0 w-14 h-12 rounded-lg font-bold transition-all border-2 flex items-center justify-center ${
+                        className={`flex-shrink-0 w-16 h-14 rounded-xl font-black text-lg transition-all border-2 flex items-center justify-center shadow-sm ${
                             selectedTable === mesa
-                            ? 'bg-orange-600 border-orange-400 text-white scale-105 shadow-lg' 
-                            : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'
+                            ? 'bg-orange-600 border-orange-400 text-white scale-105 shadow-orange-500/50' 
+                            : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'
                         }`}
                     >
                         {mesa === 'LLEVAR' ? '🛍️' : mesa}
@@ -181,35 +181,49 @@ export default function WaiterPage() {
             
             {/* INDICADOR DE MESA ACTIVA */}
             {selectedTable && (
-                <div className="bg-orange-600/20 border border-orange-600/50 text-orange-400 text-center text-xs font-bold py-1 mt-1 rounded uppercase tracking-wider">
-                    Tomando orden para: {selectedTable === 'LLEVAR' ? 'Llevar' : `Mesa ${selectedTable}`}
+                <div className="bg-orange-500 text-white text-center text-sm font-black py-2 mt-1 rounded-lg uppercase tracking-widest shadow-inner">
+                    ORDEN: {selectedTable === 'LLEVAR' ? 'PARA LLEVAR' : `MESA ${selectedTable}`}
                 </div>
             )}
         </div>
       </div>
 
-      {/* MENU ITEMS (Compacto para velocidad) */}
-      <div className="max-w-md mx-auto p-3 space-y-4 mt-2">
+      {/* MENU ITEMS (REDESARROLLADO PARA POS - ALTO CONTRASTE) */}
+      <div className="max-w-md mx-auto p-3 space-y-6 mt-4">
         {['pupusas', 'extras', 'bebidas', 'postres'].map(category => {
           const items = menu.filter((item: any) => item.category === category)
           if (items.length === 0) return null
           
           return (
-            <div key={category}>
-              <h2 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-2 ml-1 border-b border-gray-300 pb-1">{category}</h2>
-              <div className="grid grid-cols-2 gap-2">
+            <div key={category} className="mb-6">
+              {/* ENCABEZADO DE CATEGORÍA GIGANTE */}
+              <div className="bg-gray-200 rounded-xl px-4 py-3 mb-3 shadow-sm flex items-center gap-2">
+                <span className="text-2xl">
+                    {category === 'pupusas' && '🔥'}
+                    {category === 'extras' && '✨'}
+                    {category === 'bebidas' && '🥤'}
+                    {category === 'postres' && '🍰'}
+                </span>
+                <h2 className="text-lg font-black text-gray-800 uppercase tracking-widest">{category}</h2>
+              </div>
+
+              {/* CUADRÍCULA DE BOTONES */}
+              <div className="grid grid-cols-2 gap-3">
                 {items.map((item: any) => (
                   <div 
                     key={item.id} 
                     onClick={() => handleItemClick(item)}
-                    className="bg-white p-2 rounded-lg shadow-sm border border-gray-200 active:scale-95 transition-transform cursor-pointer relative overflow-hidden h-24 flex flex-col justify-between hover:border-orange-300"
+                    className="bg-white p-4 rounded-2xl shadow-sm border border-gray-300 active:scale-95 transition-transform cursor-pointer relative flex flex-col justify-between min-h-[110px] hover:border-orange-500 hover:shadow-md"
                   >
-                    <div className="font-bold text-gray-800 text-sm leading-tight line-clamp-2">
+                    {/* Nombre del plato más grande */}
+                    <div className="font-black text-gray-900 text-base leading-tight mb-2">
                         {item.name}
                     </div>
-                    <div className="flex justify-between items-end">
-                        <span className="text-xs text-gray-400 font-mono">${item.price.toFixed(2)}</span>
-                        <div className="bg-gray-100 w-6 h-6 rounded-full flex items-center justify-center text-gray-600 font-bold text-sm">+</div>
+                    
+                    {/* Precio y botón de agregar */}
+                    <div className="flex justify-between items-center mt-auto">
+                        <span className="text-sm text-gray-500 font-bold bg-gray-100 px-2 py-1 rounded-md">${item.price.toFixed(2)}</span>
+                        <div className="bg-orange-100 w-8 h-8 rounded-full flex items-center justify-center text-orange-600 font-black text-xl shadow-sm">+</div>
                     </div>
                   </div>
                 ))}
@@ -219,50 +233,50 @@ export default function WaiterPage() {
         })}
       </div>
 
-      {/* MODAL CANTIDAD (Simplificado) */}
+      {/* MODAL CANTIDAD (Se mantiene igual, ya tiene botones inmensos) */}
       {showModal && selectedItem && (
         <div className="fixed inset-0 bg-black/80 flex items-end justify-center z-50 animate-fade-in">
           <div className="bg-white w-full rounded-t-3xl p-6 shadow-2xl animate-slide-up">
-            <h3 className="text-xl font-black text-gray-900 text-center mb-6 border-b pb-4">{selectedItem.name}</h3>
+            <h3 className="text-2xl font-black text-gray-900 text-center mb-6 border-b pb-4">{selectedItem.name}</h3>
             
             {selectedItem.category === 'pupusas' ? (
                 <div className="space-y-4 mb-6">
                   {/* MAIZ */}
-                  <div className="flex items-center justify-between bg-yellow-50 p-3 rounded-xl border border-yellow-200">
-                    <span className="font-bold text-yellow-900">🌽 MAÍZ</span>
+                  <div className="flex items-center justify-between bg-yellow-50 p-3 rounded-2xl border-2 border-yellow-200">
+                    <span className="font-black text-yellow-900 text-xl">🌽 MAÍZ</span>
                     <div className="flex items-center gap-4">
-                        <button onClick={() => setCountMaiz(Math.max(0, countMaiz - 1))} className="w-12 h-12 bg-white shadow rounded-full font-bold text-2xl text-gray-500">-</button>
-                        <span className="text-3xl font-black w-8 text-center">{countMaiz}</span>
-                        <button onClick={() => setCountMaiz(countMaiz + 1)} className="w-12 h-12 bg-yellow-400 shadow rounded-full font-bold text-2xl text-white">+</button>
+                        <button onClick={() => setCountMaiz(Math.max(0, countMaiz - 1))} className="w-14 h-14 bg-white shadow-md rounded-full font-black text-3xl text-gray-400 active:scale-95">-</button>
+                        <span className="text-4xl font-black w-10 text-center">{countMaiz}</span>
+                        <button onClick={() => setCountMaiz(countMaiz + 1)} className="w-14 h-14 bg-yellow-400 shadow-md rounded-full font-black text-3xl text-white active:scale-95">+</button>
                     </div>
                   </div>
                   {/* ARROZ */}
-                  <div className="flex items-center justify-between bg-gray-100 p-3 rounded-xl border border-gray-200">
-                    <span className="font-bold text-gray-700">🍚 ARROZ</span>
+                  <div className="flex items-center justify-between bg-gray-100 p-3 rounded-2xl border-2 border-gray-300">
+                    <span className="font-black text-gray-700 text-xl">🍚 ARROZ</span>
                     <div className="flex items-center gap-4">
-                        <button onClick={() => setCountArroz(Math.max(0, countArroz - 1))} className="w-12 h-12 bg-white shadow rounded-full font-bold text-2xl text-gray-500">-</button>
-                        <span className="text-3xl font-black w-8 text-center">{countArroz}</span>
-                        <button onClick={() => setCountArroz(countArroz + 1)} className="w-12 h-12 bg-gray-300 shadow rounded-full font-bold text-2xl text-white">+</button>
+                        <button onClick={() => setCountArroz(Math.max(0, countArroz - 1))} className="w-14 h-14 bg-white shadow-md rounded-full font-black text-3xl text-gray-400 active:scale-95">-</button>
+                        <span className="text-4xl font-black w-10 text-center">{countArroz}</span>
+                        <button onClick={() => setCountArroz(countArroz + 1)} className="w-14 h-14 bg-gray-400 shadow-md rounded-full font-black text-3xl text-white active:scale-95">+</button>
                     </div>
                   </div>
                 </div>
             ) : (
                 <div className="flex items-center justify-center gap-8 mb-8">
-                    <button onClick={() => setCountBebida(Math.max(1, countBebida - 1))} className="w-16 h-16 bg-gray-200 rounded-full font-bold text-3xl text-gray-600">-</button>
+                    <button onClick={() => setCountBebida(Math.max(1, countBebida - 1))} className="w-16 h-16 bg-gray-200 rounded-full font-black text-4xl text-gray-500 active:scale-95">-</button>
                     <span className="text-6xl font-black">{countBebida}</span>
-                    <button onClick={() => setCountBebida(countBebida + 1)} className="w-16 h-16 bg-orange-500 rounded-full font-bold text-3xl text-white">+</button>
+                    <button onClick={() => setCountBebida(countBebida + 1)} className="w-16 h-16 bg-orange-500 rounded-full font-black text-4xl text-white active:scale-95">+</button>
                 </div>
             )}
 
             <button 
                 onClick={addBulkToCart} 
                 disabled={(selectedItem.category === 'pupusas' ? countMaiz + countArroz : countBebida) === 0}
-                className="w-full bg-gray-900 text-white font-black py-5 rounded-2xl text-xl shadow-xl active:scale-95 transition disabled:opacity-50"
+                className="w-full bg-gray-900 text-white font-black py-5 rounded-2xl text-2xl shadow-xl active:scale-95 transition disabled:opacity-50"
             >
                 AGREGAR {totalItemsModal > 0 && `(${totalItemsModal})`}
             </button>
             
-            <button onClick={() => setShowModal(false)} className="w-full text-gray-400 py-4 mt-2 font-bold">Cancelar</button>
+            <button onClick={() => setShowModal(false)} className="w-full text-gray-500 py-4 mt-2 font-bold text-lg">Cancelar</button>
           </div>
         </div>
       )}
@@ -271,53 +285,53 @@ export default function WaiterPage() {
       {showCheckout && (
         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-sm shadow-2xl h-[90vh] flex flex-col animate-slide-up">
-            <div className="bg-gray-900 text-white p-4 flex justify-between items-center shadow-lg">
-                <h2 className="text-xl font-black flex flex-col leading-none">
+            <div className="bg-gray-900 text-white p-5 flex justify-between items-center shadow-lg rounded-t-3xl sm:rounded-t-2xl">
+                <h2 className="text-2xl font-black flex flex-col leading-none">
                     <span>Confirmar Orden</span>
-                    <span className="text-xs text-orange-400 font-mono mt-1">{selectedTable ? (selectedTable === 'LLEVAR' ? '🛍️ PARA LLEVAR' : `MESA ${selectedTable}`) : '⚠️ SIN MESA'}</span>
+                    <span className="text-sm text-orange-400 font-mono mt-1">{selectedTable ? (selectedTable === 'LLEVAR' ? '🛍️ PARA LLEVAR' : `MESA ${selectedTable}`) : '⚠️ SIN MESA'}</span>
                 </h2>
-                <button onClick={() => setShowCheckout(false)} className="text-gray-400 font-bold px-2">Volver</button>
+                <button onClick={() => setShowCheckout(false)} className="text-gray-400 font-bold px-3 py-2 bg-gray-800 rounded-lg">Volver</button>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-gray-50">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
                 {getGroupedCart().map((group: any) => (
-                    <div key={group.id + group.dough} className="flex justify-between items-center bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
-                        <div>
-                            <div className="font-bold text-gray-800">{group.name}</div>
-                            <div className="text-xs text-gray-500 font-bold uppercase tracking-wide">{group.dough}</div>
+                    <div key={group.id + group.dough} className="flex justify-between items-center bg-white p-3 rounded-xl border-2 border-gray-200 shadow-sm">
+                        <div className="flex-1">
+                            <div className="font-black text-gray-800 text-lg leading-tight">{group.name}</div>
+                            <div className="text-xs text-orange-600 font-black uppercase tracking-widest mt-1">{group.dough}</div>
                         </div>
-                        <div className="flex items-center gap-3 bg-gray-100 rounded-lg p-1">
-                            <button onClick={() => decreaseQuantity(group)} className="w-8 h-8 flex items-center justify-center bg-white rounded shadow-sm text-lg font-bold text-red-500">-</button>
-                            <span className="font-bold text-lg min-w-[20px] text-center text-gray-900">{group.quantity}</span>
-                            <button onClick={() => increaseQuantity(group)} className="w-8 h-8 flex items-center justify-center bg-white rounded shadow-sm text-lg font-bold text-green-600">+</button>
+                        <div className="flex items-center gap-3 bg-gray-100 rounded-xl p-1 border border-gray-200 ml-2">
+                            <button onClick={() => decreaseQuantity(group)} className="w-10 h-10 flex items-center justify-center bg-white rounded-lg shadow-sm text-2xl font-black text-red-500 active:scale-95">-</button>
+                            <span className="font-black text-xl min-w-[24px] text-center text-gray-900">{group.quantity}</span>
+                            <button onClick={() => increaseQuantity(group)} className="w-10 h-10 flex items-center justify-center bg-white rounded-lg shadow-sm text-2xl font-black text-green-600 active:scale-95">+</button>
                         </div>
                     </div>
                 ))}
             </div>
 
-            <div className="p-4 border-t border-gray-200 bg-white pb-8">
+            <div className="p-5 border-t-2 border-gray-200 bg-white pb-8">
                 
                 {/* 🌟 CAMPO CONDICIONAL: SOLO APARECE SI ES 'LLEVAR' 🌟 */}
                 {selectedTable === 'LLEVAR' && (
-                    <div className="mb-4 bg-orange-50 p-3 rounded-xl border border-orange-200">
-                        <label className="block text-xs font-bold text-orange-800 mb-1 uppercase tracking-wide">Nombre del Cliente:</label>
+                    <div className="mb-4 bg-orange-50 p-4 rounded-2xl border-2 border-orange-200">
+                        <label className="block text-sm font-black text-orange-800 mb-2 uppercase tracking-wide">Nombre del Cliente:</label>
                         <input 
                             type="text" 
                             placeholder="Ej: Don Carlos"
-                            className="w-full bg-white border border-orange-300 rounded-lg p-3 outline-none focus:border-orange-500 font-bold text-gray-800"
+                            className="w-full bg-white border-2 border-orange-300 rounded-xl p-4 outline-none focus:border-orange-500 font-black text-gray-800 text-lg shadow-inner"
                             value={takeoutName}
                             onChange={(e) => setTakeoutName(e.target.value)}
                         />
                     </div>
                 )}
 
-                <div className="flex justify-between text-2xl font-black mb-4 text-gray-900">
+                <div className="flex justify-between text-3xl font-black mb-6 text-gray-900 bg-gray-100 p-4 rounded-2xl">
                     <span>Total:</span>
-                    <span>${total().toFixed(2)}</span>
+                    <span className="text-orange-600">${total().toFixed(2)}</span>
                 </div>
                 
-                <div className="grid grid-cols-4 gap-2 mb-4">
-                    <button onClick={() => clearCart()} className="col-span-1 bg-red-100 text-red-600 font-bold rounded-xl py-3 text-xs">BORRAR</button>
+                <div className="grid grid-cols-4 gap-3 mb-4">
+                    <button onClick={() => clearCart()} className="col-span-1 bg-red-100 text-red-600 font-black rounded-xl py-4 text-xs tracking-widest active:scale-95 transition-transform border border-red-200">BORRAR</button>
                     <button 
                         onClick={submitOrder}
                         disabled={isSubmitting}
@@ -333,20 +347,20 @@ export default function WaiterPage() {
 
       {/* BARRA INFERIOR FLOTANTE */}
       {cart.length > 0 && !showCheckout && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 p-3">
+        <div className="fixed bottom-0 left-0 right-0 z-40 p-4 bg-gradient-to-t from-gray-100 via-gray-100 to-transparent pt-10">
           <div className="max-w-md mx-auto">
             <button 
                 onClick={() => {
                     if(!selectedTable) { alert("⚠️ SELECCIONA UNA MESA ARRIBA"); window.scrollTo({top:0, behavior:'smooth'}); return; }
                     setShowCheckout(true);
                 }}
-                className="w-full bg-gray-900 text-white font-bold py-4 rounded-2xl shadow-2xl flex justify-between px-6 border-2 border-gray-700 hover:border-gray-500 transition-colors"
+                className="w-full bg-gray-900 text-white font-bold py-5 rounded-2xl shadow-2xl flex justify-between px-6 border-4 border-gray-800 active:scale-[0.98] transition-transform"
             >
-              <div className="flex items-center gap-2">
-                <span className="bg-orange-600 px-3 py-1 rounded-full text-sm font-black">{cart.length}</span>
-                <span>VER PEDIDO</span>
+              <div className="flex items-center gap-3">
+                <span className="bg-orange-500 px-4 py-1.5 rounded-full text-lg font-black">{cart.length}</span>
+                <span className="text-lg tracking-wide">VER COMANDA</span>
               </div>
-              <span className="text-xl font-mono text-orange-400">${total().toFixed(2)}</span>
+              <span className="text-2xl font-black text-orange-400">${total().toFixed(2)}</span>
             </button>
           </div>
         </div>
@@ -356,9 +370,9 @@ export default function WaiterPage() {
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-        .animate-fade-in { animation: fade-in 0.2s ease-out; }
+        .animate-fade-in { animation: fade-in 0.15s ease-out; }
         @keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
-        .animate-slide-up { animation: slide-up 0.2s ease-out; }
+        .animate-slide-up { animation: slide-up 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
       `}</style>
     </div>
   )
