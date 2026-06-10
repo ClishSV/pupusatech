@@ -1,7 +1,6 @@
 "use client"
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useState } from 'react'
 import { supabase } from '../../../lib/supabase' 
@@ -31,29 +30,17 @@ export default function WaiterPage() {
   const [countArroz, setCountArroz] = useState(0)
   const [countBebida, setCountBebida] = useState(1)
   
-  // 💡 NUEVO: ESTADO DEL BUSCADOR
+  // ESTADO DEL BUSCADOR
   const [searchTerm, setSearchTerm] = useState('')
 
   const { cart, addToCart, removeFromCart, total, clearCart } = useCartStore()
 
-  // 💡 NUEVO: LA REGLA INTELIGENTE PARA PUPUSAS
+  // REGLA INTELIGENTE PARA PUPUSAS
   const isPupusaItem = (item: any) => {
     if (!item) return false;
     const catName = (item.category || '').toLowerCase();
     const itemName = (item.name || '').toLowerCase();
     return catName.includes('pupusa') || itemName.includes('pupusa');
-  }
-
-  // 💡 NUEVO: RENDERIZADOR DE IMÁGENES/MONOGRAMAS (Mesero)
-  const renderItemImage = (item: any) => {
-    const hasPhoto = item?.image_url && (item.image_url.startsWith('/') || item.image_url.startsWith('http'));
-    const initial = item?.name ? item.name.charAt(0).toUpperCase() : '🍽️';
-    
-    return hasPhoto ? (
-      <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
-    ) : (
-      <span className="text-3xl font-black text-gray-400">{initial}</span>
-    );
   }
 
   useEffect(() => {
@@ -74,7 +61,7 @@ export default function WaiterPage() {
 
   const addBulkToCart = () => {
     if (!selectedItem) return
-    if (isPupusaItem(selectedItem)) { // Usando regla inteligente
+    if (isPupusaItem(selectedItem)) { 
       for (let i = 0; i < countMaiz; i++) addToCart({ cartId: crypto.randomUUID(), id: selectedItem.id, name: selectedItem.name, price: selectedItem.price, dough: 'maiz' })
       for (let i = 0; i < countArroz; i++) addToCart({ cartId: crypto.randomUUID(), id: selectedItem.id, name: selectedItem.name, price: selectedItem.price, dough: 'arroz' })
     } else {
@@ -120,7 +107,7 @@ export default function WaiterPage() {
   const tableCount = restaurant?.table_count || 15;
   const dynamicTables = [...Array.from({ length: tableCount }, (_, i) => (i + 1).toString()), 'LLEVAR']
 
-  // 💡 LÓGICA DEL BUSCADOR
+  // LÓGICA DEL BUSCADOR
   const filteredMenu = menu.filter(item => 
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     item.category.toLowerCase().includes(searchTerm.toLowerCase())
@@ -167,7 +154,7 @@ export default function WaiterPage() {
             )}
         </div>
 
-        {/* 💡 BUSCADOR EN VIVO (STICKY) */}
+        {/* BUSCADOR EN VIVO (STICKY) */}
         <div className="bg-gray-800 px-4 py-3">
           <div className="relative max-w-md mx-auto">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -175,7 +162,7 @@ export default function WaiterPage() {
             </div>
             <input
               type="text"
-              className="block w-full pl-10 pr-10 py-3 border-2 border-gray-700 rounded-xl leading-5 bg-gray-900 text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 font-bold transition-colors"
+              className="block w-full pl-10 pr-10 py-3 border-2 border-gray-700 rounded-xl leading-5 bg-gray-900 text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 font-bold transition-colors text-lg"
               placeholder="Buscar platillo..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -203,18 +190,16 @@ export default function WaiterPage() {
               <div className="grid grid-cols-2 gap-3">
                 {items.map((item: any) => (
                   <div key={item.id} onClick={() => handleItemClick(item)} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-300 active:scale-95 transition-transform cursor-pointer relative flex flex-col justify-between min-h-[110px] hover:border-orange-500">
-                    <div className="flex gap-2 mb-2">
-                      <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center shrink-0 overflow-hidden border border-gray-200">
-                         {renderItemImage(item)}
-                      </div>
-                      <div className="font-black text-gray-900 text-sm leading-tight flex-1">
-                          {item.name}
-                      </div>
+                    
+                    {/* NOMBRE DEL PLATO (GRANDE Y CLARO, SIN IMÁGENES) */}
+                    <div className="font-black text-gray-900 text-[15px] leading-snug mb-3">
+                        {item.name}
                     </div>
                     
+                    {/* PRECIO Y BOTÓN */}
                     <div className="flex justify-between items-center mt-auto">
-                        <span className="text-sm text-gray-500 font-bold bg-gray-100 px-2 py-1 rounded-md">${item.price.toFixed(2)}</span>
-                        <div className="bg-orange-100 w-8 h-8 rounded-full flex items-center justify-center text-orange-600 font-black text-xl">+</div>
+                        <span className="text-sm text-gray-500 font-bold bg-gray-100 px-2 py-1 rounded-md border border-gray-200">${item.price.toFixed(2)}</span>
+                        <div className="bg-orange-100 w-8 h-8 rounded-full flex items-center justify-center text-orange-600 font-black text-xl shadow-sm">+</div>
                     </div>
                   </div>
                 ))}
@@ -234,12 +219,10 @@ export default function WaiterPage() {
         <div className="fixed inset-0 bg-black/80 flex items-end justify-center z-50 animate-fade-in">
           <div className="bg-white w-full rounded-t-3xl p-6 shadow-2xl animate-slide-up">
             
-            <div className="flex items-center gap-4 mb-6 border-b pb-4">
-              <div className="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center shrink-0 overflow-hidden border border-gray-200">
-                {renderItemImage(selectedItem)}
-              </div>
-              <h3 className="text-2xl font-black text-gray-900 leading-tight">{selectedItem.name}</h3>
-            </div>
+            {/* TÍTULO LIMPIO (SIN IMAGEN) */}
+            <h3 className="text-2xl font-black text-gray-900 text-center mb-6 border-b border-gray-200 pb-4">
+              {selectedItem.name}
+            </h3>
             
             {isPupusaItem(selectedItem) ? (
                 <div className="space-y-4 mb-6">
@@ -305,19 +288,32 @@ export default function WaiterPage() {
             </div>
 
             <div className="p-5 border-t-2 border-gray-200 bg-white pb-8">
+                
                 {selectedTable === 'LLEVAR' && (
                     <div className="mb-4 bg-orange-50 p-4 rounded-2xl border-2 border-orange-200">
                         <label className="block text-sm font-black text-orange-800 mb-2 uppercase tracking-wide">Nombre del Cliente:</label>
-                        <input type="text" placeholder="Ej: Don Carlos" className="w-full bg-white border-2 border-orange-300 rounded-xl p-4 outline-none focus:border-orange-500 font-black text-gray-800 text-lg shadow-inner" value={takeoutName} onChange={(e) => setTakeoutName(e.target.value)} />
+                        <input 
+                            type="text" 
+                            placeholder="Ej: Don Carlos"
+                            className="w-full bg-white border-2 border-orange-300 rounded-xl p-4 outline-none focus:border-orange-500 font-black text-gray-800 text-lg shadow-inner"
+                            value={takeoutName}
+                            onChange={(e) => setTakeoutName(e.target.value)}
+                        />
                     </div>
                 )}
+
                 <div className="flex justify-between text-3xl font-black mb-6 text-gray-900 bg-gray-100 p-4 rounded-2xl">
                     <span>Total:</span>
                     <span className="text-orange-600">${total().toFixed(2)}</span>
                 </div>
+                
                 <div className="grid grid-cols-4 gap-3 mb-4">
                     <button onClick={() => clearCart()} className="col-span-1 bg-red-100 text-red-600 font-black rounded-xl py-4 text-xs tracking-widest active:scale-95 transition-transform border border-red-200">BORRAR</button>
-                    <button onClick={submitOrder} disabled={isSubmitting} className="col-span-3 bg-green-600 text-white font-black rounded-xl text-xl shadow-xl hover:bg-green-700 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                    <button 
+                        onClick={submitOrder}
+                        disabled={isSubmitting}
+                        className="col-span-3 bg-green-600 text-white font-black rounded-xl text-xl shadow-xl hover:bg-green-700 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
                         {isSubmitting ? 'ENVIANDO...' : '🚀 ENVIAR ORDEN'}
                     </button>
                 </div>
@@ -329,8 +325,17 @@ export default function WaiterPage() {
       {cart.length > 0 && !showCheckout && (
         <div className="fixed bottom-0 left-0 right-0 z-40 p-4 bg-gradient-to-t from-gray-100 via-gray-100 to-transparent pt-10">
           <div className="max-w-md mx-auto">
-            <button onClick={() => { if(!selectedTable) { alert("⚠️ SELECCIONA UNA MESA"); window.scrollTo({top:0, behavior:'smooth'}); return; } setShowCheckout(true); }} className="w-full bg-gray-900 text-white font-bold py-5 rounded-2xl shadow-2xl flex justify-between px-6 border-4 border-gray-800 active:scale-[0.98] transition-transform">
-              <div className="flex items-center gap-3"><span className="bg-orange-500 px-4 py-1.5 rounded-full text-lg font-black">{cart.length}</span><span className="text-lg tracking-wide">VER COMANDA</span></div>
+            <button 
+                onClick={() => {
+                    if(!selectedTable) { alert("⚠️ SELECCIONA UNA MESA ARRIBA"); window.scrollTo({top:0, behavior:'smooth'}); return; }
+                    setShowCheckout(true);
+                }}
+                className="w-full bg-gray-900 text-white font-bold py-5 rounded-2xl shadow-2xl flex justify-between px-6 border-4 border-gray-800 active:scale-[0.98] transition-transform"
+            >
+              <div className="flex items-center gap-3">
+                <span className="bg-orange-500 px-4 py-1.5 rounded-full text-lg font-black">{cart.length}</span>
+                <span className="text-lg tracking-wide">VER PEDIDO</span>
+              </div>
               <span className="text-2xl font-black text-orange-400">${total().toFixed(2)}</span>
             </button>
           </div>
