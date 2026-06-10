@@ -8,30 +8,30 @@ import { supabase } from '../../../../lib/supabase'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 
-// DICCIONARIO DE PLATILLOS (Para los chips rápidos)
-const MENU_TEMPLATES = [
-  { name: 'Pupusa de Queso', price: 0.80, category: 'Pupusas' },
-  { name: 'Pupusa Revuelta', price: 0.80, category: 'Pupusas' },
-  { name: 'Pupusa de Frijol con Queso', price: 0.75, category: 'Pupusas' },
-  { name: 'Pupusa de Loroco', price: 0.80, category: 'Pupusas' },
-  { name: 'Pupusa de Ayote', price: 0.75, category: 'Pupusas' },
-  { name: 'Pupusa de Ajo', price: 0.80, category: 'Pupusas' },
-  { name: 'Pupusa de Camarón', price: 1.25, category: 'Pupusas' },
-  { name: 'Pupusa Loca', price: 2.50, category: 'Pupusas' },
-  
-  { name: 'Horchata', price: 1.00, category: 'Bebidas' },
-  { name: 'Fresco Natural', price: 1.00, category: 'Bebidas' },
-  { name: 'Coca Cola', price: 1.25, category: 'Bebidas' },
-  { name: 'Café', price: 0.75, category: 'Bebidas' },
-  { name: 'Cerveza Pilsener', price: 2.00, category: 'Bebidas' },
-  
-  { name: 'Porción de Curtido', price: 0.50, category: 'Extras' },
-  { name: 'Salsa Extra', price: 0.25, category: 'Extras' },
-  
-  { name: 'Empanadas de Leche', price: 1.00, category: 'Postres' },
-  { name: 'Tres Leches', price: 2.00, category: 'Postres' },
-  { name: 'Plátano Frito', price: 1.00, category: 'Postres' },
-]
+const MENU_TEMPLATES = {
+  "🔥 Básicos de Pupusería": [
+    { name: 'Pupusa de Queso', price: 0.80, category: 'pupusas' },
+    { name: 'Pupusa Revuelta', price: 0.80, category: 'pupusas' },
+    { name: 'Pupusa de Frijol con Queso', price: 0.75, category: 'pupusas' },
+    { name: 'Pupusa de Loroco', price: 0.80, category: 'pupusas' },
+    { name: 'Pupusa de Ayote', price: 0.75, category: 'pupusas' },
+  ],
+  "✨ Extras y Complementos": [
+    { name: 'Porción de Curtido', price: 0.50, category: 'extras' },
+    { name: 'Salsa de Tomate Extra', price: 0.25, category: 'extras' },
+  ],
+  "🥤 Bebidas Populares": [
+    { name: 'Horchata', price: 1.00, category: 'bebidas' },
+    { name: 'Fresco de Arrayán', price: 1.00, category: 'bebidas' },
+    { name: 'Fresco de Jamaica', price: 1.00, category: 'bebidas' },
+    { name: 'Coca Cola', price: 1.25, category: 'bebidas' },
+    { name: 'Café Caliente', price: 0.75, category: 'bebidas' },
+  ],
+  "🍰 Postres": [
+    { name: 'Empanadas de Leche', price: 1.00, category: 'postres' },
+    { name: 'Plátano Frito', price: 1.00, category: 'postres' },
+  ]
+}
 
 export default function MenuManagerPage() {
   const params = useParams()
@@ -45,9 +45,8 @@ export default function MenuManagerPage() {
   const [tempPrice, setTempPrice] = useState<string>('')
   const [isAdding, setIsAdding] = useState(false)
 
-  // ESTADOS DEL MODAL
-  const [showModal, setShowModal] = useState(false)
-  const [targetCategory, setTargetCategory] = useState<string>('') // Si está vacío, es "Nueva Categoría"
+  const [showCustomModal, setShowCustomModal] = useState(false)
+  const [targetCategory, setTargetCategory] = useState<string>('') 
   const [customItem, setCustomItem] = useState({ name: '', price: '', category: '' })
 
   useEffect(() => {
@@ -87,17 +86,16 @@ export default function MenuManagerPage() {
     await supabase.from('menu_items').delete().eq('id', id)
   }
 
-  // --- FUNCIONES DEL MODAL ---
   const openModalForCategory = (category: string) => {
     setTargetCategory(category)
     setCustomItem({ name: '', price: '', category: category })
-    setShowModal(true)
+    setShowCustomModal(true)
   }
 
   const openModalForNewCategory = () => {
-    setTargetCategory('') // Modo: Nueva Categoría
+    setTargetCategory('') 
     setCustomItem({ name: '', price: '', category: '' })
-    setShowModal(true)
+    setShowCustomModal(true)
   }
 
   const addTemplateToMenu = async (template: any) => {
@@ -106,33 +104,39 @@ export default function MenuManagerPage() {
       restaurant_id: restaurant.id,
       name: template.name,
       price: template.price,
-      category: targetCategory || template.category,
+      category: targetCategory || template.category, // <-- Mantiene la categoría exacta
       is_available: true
     }).select().single()
 
     if (!error && data) setMenuItems(prev => [...prev, data])
     setIsAdding(false)
-    setShowModal(false)
+    setShowCustomModal(false)
   }
 
   const addCustomItem = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!customItem.name || !customItem.price || !customItem.category) return alert("Llena todos los campos")
+    if (!customItem.name || !customItem.price || (!customItem.category && !targetCategory)) return alert("Llena todos los campos")
     
     setIsAdding(true)
-    const formattedCategory = customItem.category.charAt(0).toUpperCase() + customItem.category.slice(1).toLowerCase()
+    
+    // 🔥 SOLUCIÓN AL BUG DE LAS CATEGORÍAS DUPLICADAS 🔥
+    // Si la categoría ya existe (targetCategory), usamos ese texto EXACTO.
+    // Si es nueva, la formateamos bonita (Primera mayúscula).
+    const finalCategory = targetCategory 
+      ? targetCategory 
+      : customItem.category.charAt(0).toUpperCase() + customItem.category.slice(1).toLowerCase()
 
     const { data, error } = await supabase.from('menu_items').insert({
       restaurant_id: restaurant.id,
       name: customItem.name,
       price: parseFloat(customItem.price),
-      category: formattedCategory,
+      category: finalCategory,
       is_available: true
     }).select().single()
 
     if (!error && data) {
       setMenuItems(prev => [...prev, data])
-      setShowModal(false)
+      setShowCustomModal(false)
     }
     setIsAdding(false)
   }
@@ -140,9 +144,8 @@ export default function MenuManagerPage() {
   const isItemInMenu = (name: string) => menuItems.some(item => item.name.toLowerCase() === name.toLowerCase())
   const uniqueCategories = Array.from(new Set(menuItems.map(item => item.category)))
   
-  // Filtrar templates basados en la categoría actual del modal
   const suggestedTemplates = targetCategory 
-    ? MENU_TEMPLATES.filter(t => t.category.toLowerCase() === targetCategory.toLowerCase())
+    ? Object.values(MENU_TEMPLATES).flat().filter(t => t.category.toLowerCase() === targetCategory.toLowerCase())
     : []
 
   if (loading) return <div className="min-h-screen flex items-center justify-center font-bold text-gray-500">Cargando menú...</div>
@@ -167,16 +170,21 @@ export default function MenuManagerPage() {
 
       <div className="max-w-3xl mx-auto px-4 mt-6 space-y-8">
         
-        {/* ==========================================
-            RENDERIZADO POR CATEGORÍAS
-            ========================================== */}
+        {/* RENDERIZADO POR CATEGORÍAS */}
         {uniqueCategories.map(category => {
           const itemsInCategory = menuItems.filter(item => item.category === category)
+          const catNameStr = String(category);
           
           return (
-            <div key={category as string} className="bg-white p-5 rounded-3xl shadow-sm border border-gray-200">
+            <div key={catNameStr} className="bg-white p-5 rounded-3xl shadow-sm border border-gray-200">
               <h2 className="text-xl font-black text-gray-800 uppercase tracking-widest mb-4 border-b-2 border-gray-100 pb-2 flex justify-between items-center">
-                {category as string}
+                <span className="flex items-center gap-2">
+                  {catNameStr.toLowerCase() === 'pupusas' ? '🔥 Pupusas' : 
+                   catNameStr.toLowerCase() === 'extras' ? '✨ Extras' : 
+                   catNameStr.toLowerCase() === 'bebidas' ? '🥤 Bebidas' : 
+                   catNameStr.toLowerCase() === 'postres' ? '🍰 Postres' : 
+                   `🍽️ ${catNameStr}`}
+                </span>
                 <span className="bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded-full">{itemsInCategory.length} items</span>
               </h2>
 
@@ -204,7 +212,7 @@ export default function MenuManagerPage() {
                           </div>
                         </div>
 
-                        {/* ACCIONES (PRECIO, SWITCH, BASURA) */}
+                        {/* ACCIONES */}
                         <div className="flex items-center gap-3">
                           {editingId === item.id ? (
                             <div className="flex items-center gap-1 bg-white p-1 rounded-lg shadow-sm">
@@ -231,20 +239,20 @@ export default function MenuManagerPage() {
                 })}
               </div>
 
-              {/* BOTÓN AGREGAR A ESTA CATEGORÍA */}
+              {/* BOTÓN DINÁMICO DE AGREGAR */}
               <button 
-                onClick={() => openModalForCategory(category as string)}
+                onClick={() => openModalForCategory(catNameStr)}
                 className="w-full border-2 border-dashed border-gray-300 rounded-xl py-3 text-gray-500 font-bold hover:bg-orange-50 hover:text-orange-600 hover:border-orange-300 transition-colors text-sm"
               >
-                + Agregar platillo a {category as string}
+                {catNameStr.toLowerCase() === 'bebidas' 
+                  ? `+ Agregar bebida a ${catNameStr}` 
+                  : `+ Agregar platillo a ${catNameStr}`}
               </button>
             </div>
           )
         })}
 
-        {/* ==========================================
-            BOTÓN: NUEVA CATEGORÍA
-            ========================================== */}
+        {/* BOTÓN: NUEVA CATEGORÍA */}
         <button 
             onClick={openModalForNewCategory}
             className="w-full bg-gray-900 text-white rounded-2xl py-4 font-black text-lg shadow-lg hover:bg-orange-600 active:scale-95 transition-all flex items-center justify-center gap-2"
@@ -254,22 +262,20 @@ export default function MenuManagerPage() {
 
       </div>
 
-      {/* ==========================================
-          MODAL DE CREACIÓN
-          ========================================== */}
-      {showModal && (
+      {/* MODAL DE CREACIÓN */}
+      {showCustomModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
           <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-scale-up flex flex-col max-h-[90vh]">
             <div className="bg-gray-900 p-5 flex justify-between items-center text-white shrink-0">
                 <h3 className="text-xl font-black">{targetCategory ? `Agregar a ${targetCategory}` : 'Nueva Categoría'}</h3>
-                <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-white font-bold text-xl">✕</button>
+                <button onClick={() => setShowCustomModal(false)} className="text-gray-400 hover:text-white font-bold text-xl">✕</button>
             </div>
             
             <div className="p-6 overflow-y-auto">
-                {/* MOSTRAR CHIPS SI ES UNA CATEGORÍA EXISTENTE Y TIENE TEMPLATES */}
+                {/* MOSTRAR CHIPS SI ES UNA CATEGORÍA EXISTENTE */}
                 {targetCategory && suggestedTemplates.length > 0 && (
                     <div className="mb-6 pb-6 border-b border-gray-100">
-                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Agregar Rápido (Chips)</label>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Agregar Rápido</label>
                         <div className="flex flex-wrap gap-2">
                             {suggestedTemplates.map((template, idx) => {
                                 const exists = isItemInMenu(template.name)

@@ -195,16 +195,18 @@ export default function WaiterPage() {
           if (items.length === 0) return null
           
           return (
-            <div key={category} className="mb-6">
-              {/* ENCABEZADO DE CATEGORÍA GIGANTE */}
+         <div key={category as string} className="mb-6">
+              {/* ENCABEZADO DE CATEGORÍA GIGANTE (DINÁMICO) */}
               <div className="bg-gray-200 rounded-xl px-4 py-3 mb-3 shadow-sm flex items-center gap-2">
                 <span className="text-2xl">
-                    {category === 'pupusas' && '🔥'}
-                    {category === 'extras' && '✨'}
-                    {category === 'bebidas' && '🥤'}
-                    {category === 'postres' && '🍰'}
+                    {String(category).toLowerCase() === 'pupusas' ? '🔥' :
+                     String(category).toLowerCase() === 'extras' ? '✨' :
+                     String(category).toLowerCase() === 'bebidas' ? '🥤' :
+                     String(category).toLowerCase() === 'postres' ? '🍰' : '🍽️'}
                 </span>
-                <h2 className="text-lg font-black text-gray-800 uppercase tracking-widest">{category}</h2>
+                <h2 className="text-lg font-black text-gray-800 uppercase tracking-widest">
+                  {category as string}
+                </h2>
               </div>
 
               {/* CUADRÍCULA DE BOTONES */}

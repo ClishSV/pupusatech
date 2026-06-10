@@ -397,13 +397,14 @@ export default function MenuPage() {
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t-2 border-gray-200"></div>
                 </div>
-                <div className="relative flex justify-center">
+              <div className="relative flex justify-center">
                   <span className="bg-gradient-to-b from-gray-50 to-white px-6 py-2 rounded-full border-2 border-gray-200 shadow-sm">
                     <h2 className="text-xl font-black text-gray-800 tracking-tight capitalize flex items-center gap-2">
-                      {category === 'pupusas' && <><span className="text-2xl">🔥</span> Pupusas</>}
-                      {category === 'extras' && <><span className="text-2xl">✨</span> Extras</>}
-                      {category === 'bebidas' && <><span className="text-2xl">🥤</span> Bebidas</>}
-                      {category === 'postres' && <><span className="text-2xl">🍰</span> Postres</>}
+                      {String(category).toLowerCase() === 'pupusas' ? <><span className="text-2xl">🔥</span> Pupusas</> :
+                       String(category).toLowerCase() === 'extras' ? <><span className="text-2xl">✨</span> Extras</> :
+                       String(category).toLowerCase() === 'bebidas' ? <><span className="text-2xl">🥤</span> Bebidas</> :
+                       String(category).toLowerCase() === 'postres' ? <><span className="text-2xl">🍰</span> Postres</> :
+                       <><span className="text-2xl">🍽️</span> {category as string}</>}
                     </h2>
                   </span>
                 </div>
