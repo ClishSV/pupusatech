@@ -190,7 +190,7 @@ export default function WaiterPage() {
 
       {/* MENU ITEMS (REDESARROLLADO PARA POS - ALTO CONTRASTE) */}
       <div className="max-w-md mx-auto p-3 space-y-6 mt-4">
-        {['pupusas', 'extras', 'bebidas', 'postres'].map(category => {
+          {Array.from(new Set(menu.map((item: any) => item.category))).map(category => {
           const items = menu.filter((item: any) => item.category === category)
           if (items.length === 0) return null
           

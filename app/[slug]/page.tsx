@@ -386,7 +386,7 @@ export default function MenuPage() {
 
       {/* MENÚ CON DISEÑO MEJORADO */}
       <div className="max-w-2xl mx-auto p-5 space-y-8">
-        {['pupusas', 'extras', 'bebidas', 'postres'].map(category => {
+        {Array.from(new Set(menu.map((item: any) => item.category))).map(category => {
         
           const items = menu.filter((item: any) => item.category === category)
           if (items.length === 0) return null
