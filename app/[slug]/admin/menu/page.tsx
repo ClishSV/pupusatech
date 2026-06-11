@@ -8,28 +8,22 @@ import { supabase } from '../../../../lib/supabase'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 
+// DICCIONARIO DE PLATILLOS (Plantillas)
 const MENU_TEMPLATES = {
   "🔥 Básicos de Pupusería": [
-    { name: 'Pupusa de Queso', price: 0.80, category: 'pupusas' },
-    { name: 'Pupusa Revuelta', price: 0.80, category: 'pupusas' },
-    { name: 'Pupusa de Frijol con Queso', price: 0.75, category: 'pupusas' },
-    { name: 'Pupusa de Loroco', price: 0.80, category: 'pupusas' },
-    { name: 'Pupusa de Ayote', price: 0.75, category: 'pupusas' },
+    { name: 'Pupusa de Queso', price: 0.80, category: 'Pupusas' },
+    { name: 'Pupusa Revuelta', price: 0.80, category: 'Pupusas' },
+    { name: 'Pupusa de Frijol con Queso', price: 0.75, category: 'Pupusas' },
+    { name: 'Pupusa de Loroco', price: 0.80, category: 'Pupusas' },
   ],
   "✨ Extras y Complementos": [
-    { name: 'Porción de Curtido', price: 0.50, category: 'extras' },
-    { name: 'Salsa de Tomate Extra', price: 0.25, category: 'extras' },
+    { name: 'Porción de Curtido', price: 0.50, category: 'Extras' },
+    { name: 'Salsa de Tomate Extra', price: 0.25, category: 'Extras' },
   ],
   "🥤 Bebidas Populares": [
-    { name: 'Horchata', price: 1.00, category: 'bebidas' },
-    { name: 'Fresco de Arrayán', price: 1.00, category: 'bebidas' },
-    { name: 'Fresco de Jamaica', price: 1.00, category: 'bebidas' },
-    { name: 'Coca Cola', price: 1.25, category: 'bebidas' },
-    { name: 'Café Caliente', price: 0.75, category: 'bebidas' },
-  ],
-  "🍰 Postres": [
-    { name: 'Empanadas de Leche', price: 1.00, category: 'postres' },
-    { name: 'Plátano Frito', price: 1.00, category: 'postres' },
+    { name: 'Horchata', price: 1.00, category: 'Bebidas' },
+    { name: 'Coca Cola', price: 1.25, category: 'Bebidas' },
+    { name: 'Café Caliente', price: 0.75, category: 'Bebidas' },
   ]
 }
 
@@ -40,14 +34,13 @@ export default function MenuManagerPage() {
   const [restaurant, setRestaurant] = useState<any>(null)
   const [menuItems, setMenuItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [tempPrice, setTempPrice] = useState<string>('')
   const [isAdding, setIsAdding] = useState(false)
 
+  // ESTADOS DEL MODAL (AHORA SIRVE PARA CREAR Y EDITAR)
   const [showCustomModal, setShowCustomModal] = useState(false)
   const [targetCategory, setTargetCategory] = useState<string>('') 
-  const [customItem, setCustomItem] = useState({ name: '', price: '', category: '' })
+  // Nota: Agregamos 'id' al estado para saber si estamos editando
+  const [customItem, setCustomItem] = useState({ id: '', name: '', price: '', category: '' })
 
   useEffect(() => {
     async function fetchData() {
@@ -57,27 +50,16 @@ export default function MenuManagerPage() {
       setRestaurant(restData)
 
       const { data: menuData } = await supabase.from('menu_items').select('*').eq('restaurant_id', restData.id)
-        .order('category', { ascending: true }).order('name', { ascending: true })
-
       if (menuData) setMenuItems(menuData)
       setLoading(false)
     }
     fetchData()
   }, [slug])
 
+  // --- DISPONIBILIDAD Y BORRADO ---
   const toggleAvailability = async (id: string, currentStatus: boolean) => {
     setMenuItems(prev => prev.map(item => item.id === id ? { ...item, is_available: !currentStatus } : item))
     await supabase.from('menu_items').update({ is_available: !currentStatus }).eq('id', id)
-  }
-
-  const startEditing = (item: any) => { setEditingId(item.id); setTempPrice(item.price.toString()) }
-
-  const savePrice = async (id: string) => {
-    const newPrice = parseFloat(tempPrice)
-    if (isNaN(newPrice)) return
-    setMenuItems(prev => prev.map(item => item.id === id ? { ...item, price: newPrice } : item))
-    setEditingId(null)
-    await supabase.from('menu_items').update({ price: newPrice }).eq('id', id)
   }
 
   const deleteItem = async (id: string) => {
@@ -86,67 +68,92 @@ export default function MenuManagerPage() {
     await supabase.from('menu_items').delete().eq('id', id)
   }
 
-  const openModalForCategory = (category: string) => {
-    setTargetCategory(category)
-    setCustomItem({ name: '', price: '', category: category })
+  // --- FUNCIONES DEL MODAL (CREAR Y EDITAR) ---
+  const openModalForNewCategory = () => {
+    setTargetCategory('') 
+    setCustomItem({ id: '', name: '', price: '', category: '' })
     setShowCustomModal(true)
   }
 
-  const openModalForNewCategory = () => {
-    setTargetCategory('') 
-    setCustomItem({ name: '', price: '', category: '' })
+  const openModalForCategory = (category: string) => {
+    setTargetCategory(category)
+    setCustomItem({ id: '', name: '', price: '', category: category })
     setShowCustomModal(true)
+  }
+
+  // NUEVO: Abrir modal para EDITAR un item existente
+  const openModalForEdit = (item: any) => {
+    setTargetCategory('') // Ocultamos los chips rápidos al editar
+    setCustomItem({ 
+      id: item.id, 
+      name: item.name, 
+      price: item.price.toString(), 
+      category: item.category 
+    })
+    setShowCustomModal(true)
+  }
+
+  const saveCustomItem = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!customItem.name || !customItem.price || (!customItem.category && !targetCategory)) return alert("Llena todos los campos")
+    
+    setIsAdding(true)
+    const finalCategory = targetCategory ? targetCategory : customItem.category.charAt(0).toUpperCase() + customItem.category.slice(1).toLowerCase()
+
+    if (customItem.id) {
+      // ESTAMOS EDITANDO
+      const { data, error } = await supabase.from('menu_items').update({
+        name: customItem.name,
+        price: parseFloat(customItem.price),
+        category: finalCategory
+      }).eq('id', customItem.id).select().single()
+
+      if (!error && data) {
+        setMenuItems(prev => prev.map(item => item.id === customItem.id ? data : item))
+        setShowCustomModal(false)
+      }
+    } else {
+      // ESTAMOS CREANDO NUEVO
+      const { data, error } = await supabase.from('menu_items').insert({
+        restaurant_id: restaurant.id,
+        name: customItem.name,
+        price: parseFloat(customItem.price),
+        category: finalCategory,
+        is_available: true
+      }).select().single()
+
+      if (!error && data) {
+        setMenuItems(prev => [...prev, data])
+        setShowCustomModal(false)
+      }
+    }
+    setIsAdding(false)
   }
 
   const addTemplateToMenu = async (template: any) => {
     setIsAdding(true)
     const { data, error } = await supabase.from('menu_items').insert({
-      restaurant_id: restaurant.id,
-      name: template.name,
-      price: template.price,
-      category: targetCategory || template.category, // <-- Mantiene la categoría exacta
-      is_available: true
+      restaurant_id: restaurant.id, name: template.name, price: template.price, category: targetCategory || template.category, is_available: true
     }).select().single()
-
     if (!error && data) setMenuItems(prev => [...prev, data])
-    setIsAdding(false)
-    setShowCustomModal(false)
+    setIsAdding(false); setShowCustomModal(false)
   }
 
-  const addCustomItem = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!customItem.name || !customItem.price || (!customItem.category && !targetCategory)) return alert("Llena todos los campos")
-    
-    setIsAdding(true)
-    
-    // 🔥 SOLUCIÓN AL BUG DE LAS CATEGORÍAS DUPLICADAS 🔥
-    // Si la categoría ya existe (targetCategory), usamos ese texto EXACTO.
-    // Si es nueva, la formateamos bonita (Primera mayúscula).
-    const finalCategory = targetCategory 
-      ? targetCategory 
-      : customItem.category.charAt(0).toUpperCase() + customItem.category.slice(1).toLowerCase()
-
-    const { data, error } = await supabase.from('menu_items').insert({
-      restaurant_id: restaurant.id,
-      name: customItem.name,
-      price: parseFloat(customItem.price),
-      category: finalCategory,
-      is_available: true
-    }).select().single()
-
-    if (!error && data) {
-      setMenuItems(prev => [...prev, data])
-      setShowCustomModal(false)
-    }
-    setIsAdding(false)
+  // --- ORDENAMIENTO INTELIGENTE DE CATEGORÍAS ---
+  const getCategoryWeight = (cat: string) => {
+    const lower = cat.toLowerCase();
+    if (lower.includes('pupusa')) return 1;
+    if (lower.includes('extra') || lower.includes('acompaña')) return 2;
+    if (lower.includes('bebida')) return 3;
+    if (lower.includes('postre')) return 4;
+    return 5; // Categorías nuevas van al final
   }
+
+  const uniqueCategories = Array.from(new Set(menuItems.map(item => item.category)))
+    .sort((a: any, b: any) => getCategoryWeight(a) - getCategoryWeight(b) || a.localeCompare(b))
 
   const isItemInMenu = (name: string) => menuItems.some(item => item.name.toLowerCase() === name.toLowerCase())
-  const uniqueCategories = Array.from(new Set(menuItems.map(item => item.category)))
-  
-  const suggestedTemplates = targetCategory 
-    ? Object.values(MENU_TEMPLATES).flat().filter(t => t.category.toLowerCase() === targetCategory.toLowerCase())
-    : []
+  const suggestedTemplates = targetCategory ? Object.values(MENU_TEMPLATES).flat().filter(t => t.category.toLowerCase() === targetCategory.toLowerCase()) : []
 
   if (loading) return <div className="min-h-screen flex items-center justify-center font-bold text-gray-500">Cargando menú...</div>
 
@@ -165,25 +172,32 @@ export default function MenuManagerPage() {
               <p className="text-xs text-orange-600 font-bold uppercase tracking-wider mt-1">{restaurant?.name}</p>
             </div>
           </div>
+          <div className="bg-gray-900 text-white px-3 py-1 rounded-lg text-sm font-bold shadow-sm">
+            {menuItems.length} items
+          </div>
         </div>
       </div>
 
       <div className="max-w-3xl mx-auto px-4 mt-6 space-y-8">
         
-        {/* RENDERIZADO POR CATEGORÍAS */}
+        {/* RENDERIZADO POR CATEGORÍAS (ORDENADAS) */}
         {uniqueCategories.map(category => {
-          const itemsInCategory = menuItems.filter(item => item.category === category)
+          // Ordenar los items alfabéticamente dentro de la categoría
+          const itemsInCategory = menuItems
+            .filter(item => item.category === category)
+            .sort((a, b) => a.name.localeCompare(b.name))
+            
           const catNameStr = String(category);
           
           return (
             <div key={catNameStr} className="bg-white p-5 rounded-3xl shadow-sm border border-gray-200">
               <h2 className="text-xl font-black text-gray-800 uppercase tracking-widest mb-4 border-b-2 border-gray-100 pb-2 flex justify-between items-center">
                 <span className="flex items-center gap-2">
-                  {catNameStr.toLowerCase() === 'pupusas' ? '🔥 Pupusas' : 
-                   catNameStr.toLowerCase() === 'extras' ? '✨ Extras' : 
-                   catNameStr.toLowerCase() === 'bebidas' ? '🥤 Bebidas' : 
-                   catNameStr.toLowerCase() === 'postres' ? '🍰 Postres' : 
-                   `🍽️ ${catNameStr}`}
+                  {catNameStr.toLowerCase().includes('pupusa') ? '🔥' : 
+                   catNameStr.toLowerCase().includes('extra') ? '✨' : 
+                   catNameStr.toLowerCase().includes('bebida') ? '🥤' : 
+                   catNameStr.toLowerCase().includes('postre') ? '🍰' : '🍽️'}
+                   {catNameStr}
                 </span>
                 <span className="bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded-full">{itemsInCategory.length} items</span>
               </h2>
@@ -197,7 +211,7 @@ export default function MenuManagerPage() {
                   <div key={item.id} className={`bg-gray-50 rounded-2xl border-l-4 transition-all ${item.is_available ? 'border-green-500' : 'border-gray-300 opacity-60'}`}>
                     <div className="p-3">
                       <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-3 flex-1">
+                        <div className="flex items-center gap-4 flex-1">
                           {/* FOTO O INICIAL */}
                           <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shrink-0 border border-gray-200 overflow-hidden shadow-sm">
                             {hasPhotoUrl ? (
@@ -214,23 +228,19 @@ export default function MenuManagerPage() {
 
                         {/* ACCIONES */}
                         <div className="flex items-center gap-3">
-                          {editingId === item.id ? (
-                            <div className="flex items-center gap-1 bg-white p-1 rounded-lg shadow-sm">
-                              <span className="text-gray-500 font-bold text-sm">$</span>
-                              <input type="number" step="0.05" value={tempPrice} onChange={(e) => setTempPrice(e.target.value)} className="w-16 p-1 border border-orange-300 rounded focus:outline-none text-right font-bold text-sm" autoFocus/>
-                              <button onClick={() => savePrice(item.id)} className="bg-green-500 text-white px-2 py-1 rounded text-xs font-bold active:scale-95">OK</button>
-                            </div>
-                          ) : (
-                            <button onClick={() => startEditing(item)} className="bg-white px-2 py-1 rounded border border-gray-200 shadow-sm hover:border-orange-300 text-sm font-black text-gray-800">
-                              ${item.price.toFixed(2)} ✏️
-                            </button>
-                          )}
+                          {/* BOTÓN DE EDITAR ABRE EL MODAL AHORA */}
+                          <button onClick={() => openModalForEdit(item)} className="bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm hover:border-orange-300 text-sm font-black text-gray-800 flex items-center gap-2 transition-colors">
+                            <span>${item.price.toFixed(2)}</span>
+                            <span className="text-xs text-gray-400">✏️ Editar</span>
+                          </button>
 
-                          <label className="relative inline-flex items-center cursor-pointer">
+                          <label className="relative inline-flex items-center cursor-pointer" title={item.is_available ? 'Desactivar' : 'Activar'}>
                             <input type="checkbox" className="sr-only peer" checked={item.is_available} onChange={() => toggleAvailability(item.id, item.is_available)}/>
                             <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
                           </label>
-                          <button onClick={() => deleteItem(item.id)} className="text-gray-400 hover:text-red-500 p-1">🗑️</button>
+                          <button onClick={() => deleteItem(item.id)} className="text-gray-400 hover:text-red-500 p-2 bg-gray-100 rounded-lg hover:bg-red-50 transition-colors" title="Borrar Producto">
+                             🗑️
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -244,9 +254,7 @@ export default function MenuManagerPage() {
                 onClick={() => openModalForCategory(catNameStr)}
                 className="w-full border-2 border-dashed border-gray-300 rounded-xl py-3 text-gray-500 font-bold hover:bg-orange-50 hover:text-orange-600 hover:border-orange-300 transition-colors text-sm"
               >
-                {catNameStr.toLowerCase() === 'bebidas' 
-                  ? `+ Agregar bebida a ${catNameStr}` 
-                  : `+ Agregar platillo a ${catNameStr}`}
+                + Agregar producto a {catNameStr}
               </button>
             </div>
           )
@@ -262,18 +270,20 @@ export default function MenuManagerPage() {
 
       </div>
 
-      {/* MODAL DE CREACIÓN */}
+      {/* MODAL DE CREACIÓN / EDICIÓN */}
       {showCustomModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
           <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-scale-up flex flex-col max-h-[90vh]">
             <div className="bg-gray-900 p-5 flex justify-between items-center text-white shrink-0">
-                <h3 className="text-xl font-black">{targetCategory ? `Agregar a ${targetCategory}` : 'Nueva Categoría'}</h3>
+                <h3 className="text-xl font-black">
+                  {customItem.id ? 'Editar Platillo' : (targetCategory ? `Agregar a ${targetCategory}` : 'Nueva Categoría')}
+                </h3>
                 <button onClick={() => setShowCustomModal(false)} className="text-gray-400 hover:text-white font-bold text-xl">✕</button>
             </div>
             
             <div className="p-6 overflow-y-auto">
-                {/* MOSTRAR CHIPS SI ES UNA CATEGORÍA EXISTENTE */}
-                {targetCategory && suggestedTemplates.length > 0 && (
+                {/* MOSTRAR CHIPS SOLO SI ESTAMOS CREANDO (NO EDITANDO) */}
+                {!customItem.id && targetCategory && suggestedTemplates.length > 0 && (
                     <div className="mb-6 pb-6 border-b border-gray-100">
                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Agregar Rápido</label>
                         <div className="flex flex-wrap gap-2">
@@ -293,28 +303,33 @@ export default function MenuManagerPage() {
                 )}
 
                 {/* FORMULARIO MANUAL */}
-                <form onSubmit={addCustomItem} className="space-y-4">
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest -mb-2">Creación Manual</label>
+                <form onSubmit={saveCustomItem} className="space-y-4">
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest -mb-2">
+                      {customItem.id ? 'Modificar Datos' : 'Creación Manual'}
+                    </label>
                     
-                    {!targetCategory && (
+                    {(!targetCategory || customItem.id) && (
                         <div>
                             <label className="block text-xs font-bold text-gray-700 mb-1">Nombre de Categoría</label>
-                            <input required type="text" value={customItem.category} onChange={e => setCustomItem({...customItem, category: e.target.value})} className="w-full border-2 border-gray-200 p-3 rounded-xl font-bold focus:border-orange-500 outline-none" placeholder="Ej: Desayunos, Pizzas..."/>
+                            <input required type="text" list="categoriesList" value={customItem.category} onChange={e => setCustomItem({...customItem, category: e.target.value})} className="w-full border-2 border-gray-200 p-3 rounded-xl font-bold focus:border-orange-500 outline-none text-gray-800" placeholder="Ej: Desayunos, Pizzas..."/>
+                            <datalist id="categoriesList">
+                              {uniqueCategories.map(cat => <option key={cat as string} value={cat as string} />)}
+                            </datalist>
                         </div>
                     )}
 
                     <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">Nombre del Platillo</label>
-                        <input required type="text" value={customItem.name} onChange={e => setCustomItem({...customItem, name: e.target.value})} className="w-full border-2 border-gray-200 p-3 rounded-xl font-bold focus:border-orange-500 outline-none" placeholder="Ej: Pizza Personal"/>
+                        <input required type="text" value={customItem.name} onChange={e => setCustomItem({...customItem, name: e.target.value})} className="w-full border-2 border-gray-200 p-3 rounded-xl font-bold focus:border-orange-500 outline-none text-gray-800" placeholder="Ej: Pizza Personal"/>
                     </div>
                     
                     <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">Precio ($)</label>
-                        <input required type="number" step="0.01" value={customItem.price} onChange={e => setCustomItem({...customItem, price: e.target.value})} className="w-full border-2 border-gray-200 p-3 rounded-xl font-bold focus:border-orange-500 outline-none" placeholder="3.50"/>
+                        <input required type="number" step="0.01" value={customItem.price} onChange={e => setCustomItem({...customItem, price: e.target.value})} className="w-full border-2 border-gray-200 p-3 rounded-xl font-bold focus:border-orange-500 outline-none text-gray-800" placeholder="3.50"/>
                     </div>
 
-                    <button type="submit" disabled={isAdding} className="w-full bg-orange-600 text-white font-black py-4 rounded-xl hover:bg-orange-700 mt-4 disabled:opacity-50">
-                        Guardar Platillo
+                    <button type="submit" disabled={isAdding} className="w-full bg-orange-600 text-white font-black text-lg py-4 rounded-xl hover:bg-orange-700 mt-4 disabled:opacity-50 shadow-lg active:scale-95 transition-all">
+                        {customItem.id ? '💾 Guardar Cambios' : '➕ Agregar Platillo'}
                     </button>
                 </form>
             </div>
