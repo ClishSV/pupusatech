@@ -35,7 +35,7 @@ export default function WaiterPage() {
 
   const { cart, addToCart, removeFromCart, total, clearCart } = useCartStore()
 
-  // 💡 LA REGLA INTELIGENTE (Igual que en el cliente)
+  // 💡 REGLA INTELIGENTE PARA PUPUSAS
   const isPupusaItem = (item: any) => {
     if (!item) return false;
     const catName = (item.category || '').toLowerCase();
@@ -44,7 +44,7 @@ export default function WaiterPage() {
     return pupusaKeywords.some(kw => catName.includes(kw) || itemName.includes(kw));
   }
 
-  // 💡 LA BÁSCULA DE CATEGORÍAS (Igual que en el cliente)
+  // 💡 ORDENADOR DE CATEGORÍAS (La Báscula)
   const getCategoryWeight = (category: string) => {
     const lower = String(category).toLowerCase();
     if (lower.includes('tradicional')) return 1;
@@ -58,17 +58,6 @@ export default function WaiterPage() {
     if (lower.includes('bebida') || lower.includes('fresco') || lower.includes('soda')) return 9;
     if (lower.includes('postre') || lower.includes('dulce')) return 10;
     return 11;
-  }
-
-  const renderItemImage = (item: any) => {
-    const hasPhoto = item?.image_url && (item.image_url.startsWith('/') || item.image_url.startsWith('http'));
-    const initial = item?.name ? item.name.charAt(0).toUpperCase() : '🍽️';
-    
-    return hasPhoto ? (
-      <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
-    ) : (
-      <span className="text-3xl font-black text-gray-400">{initial}</span>
-    );
   }
 
   useEffect(() => {
@@ -131,10 +120,11 @@ export default function WaiterPage() {
   }
 
   const totalItemsModal = isPupusaItem(selectedItem) ? countMaiz + countArroz : countBebida
+
   const tableCount = restaurant?.table_count || 15;
   const dynamicTables = [...Array.from({ length: tableCount }, (_, i) => (i + 1).toString()), 'LLEVAR']
 
-  // BUSCADOR EN VIVO Y ORDENAMIENTO
+  // LÓGICA DEL BUSCADOR
   const filteredMenu = menu.filter(item => 
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     item.category.toLowerCase().includes(searchTerm.toLowerCase())
@@ -225,14 +215,12 @@ export default function WaiterPage() {
               <div className="grid grid-cols-2 gap-3">
                 {items.map((item: any) => (
                   <div key={item.id} onClick={() => handleItemClick(item)} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-300 active:scale-95 transition-transform cursor-pointer relative flex flex-col justify-between min-h-[110px] hover:border-orange-500">
-                    <div className="flex gap-2 mb-2">
-                      <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center shrink-0 overflow-hidden border border-gray-200">
-                         {renderItemImage(item)}
-                      </div>
-                      <div className="font-black text-gray-900 text-sm leading-tight flex-1">
-                          {item.name}
-                      </div>
+                    
+                    {/* TEXTO GRANDE SIN FOTO (UX POS) */}
+                    <div className="font-black text-gray-900 text-[15px] leading-snug mb-3">
+                        {item.name}
                     </div>
+                    
                     <div className="flex justify-between items-center mt-auto">
                         <span className="text-sm text-gray-500 font-bold bg-gray-100 px-2 py-1 rounded-md border border-gray-200">${item.price.toFixed(2)}</span>
                         <div className="bg-orange-100 w-8 h-8 rounded-full flex items-center justify-center text-orange-600 font-black text-xl shadow-sm">+</div>
@@ -250,16 +238,14 @@ export default function WaiterPage() {
         )}
       </div>
 
+      {/* MODAL CANTIDAD (SIN FOTO PARA VELOCIDAD) */}
       {showModal && selectedItem && (
         <div className="fixed inset-0 bg-black/80 flex items-end justify-center z-50 animate-fade-in">
           <div className="bg-white w-full rounded-t-3xl p-6 shadow-2xl animate-slide-up">
             
-            <div className="flex items-center gap-4 mb-6 border-b pb-4">
-              <div className="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center shrink-0 overflow-hidden border border-gray-200">
-                {renderItemImage(selectedItem)}
-              </div>
-              <h3 className="text-2xl font-black text-gray-900 leading-tight">{selectedItem.name}</h3>
-            </div>
+            <h3 className="text-2xl font-black text-gray-900 text-center mb-6 border-b border-gray-200 pb-4">
+              {selectedItem.name}
+            </h3>
             
             {isPupusaItem(selectedItem) ? (
                 <div className="space-y-4 mb-6">
@@ -296,6 +282,7 @@ export default function WaiterPage() {
         </div>
       )}
 
+      {/* CHECKOUT RÁPIDO */}
       {showCheckout && (
         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-sm shadow-2xl h-[90vh] flex flex-col animate-slide-up">
@@ -324,19 +311,32 @@ export default function WaiterPage() {
             </div>
 
             <div className="p-5 border-t-2 border-gray-200 bg-white pb-8">
+                
                 {selectedTable === 'LLEVAR' && (
                     <div className="mb-4 bg-orange-50 p-4 rounded-2xl border-2 border-orange-200">
                         <label className="block text-sm font-black text-orange-800 mb-2 uppercase tracking-wide">Nombre del Cliente:</label>
-                        <input type="text" placeholder="Ej: Don Carlos" className="w-full bg-white border-2 border-orange-300 rounded-xl p-4 outline-none focus:border-orange-500 font-black text-gray-800 text-lg shadow-inner" value={takeoutName} onChange={(e) => setTakeoutName(e.target.value)} />
+                        <input 
+                            type="text" 
+                            placeholder="Ej: Don Carlos"
+                            className="w-full bg-white border-2 border-orange-300 rounded-xl p-4 outline-none focus:border-orange-500 font-black text-gray-800 text-lg shadow-inner"
+                            value={takeoutName}
+                            onChange={(e) => setTakeoutName(e.target.value)}
+                        />
                     </div>
                 )}
+
                 <div className="flex justify-between text-3xl font-black mb-6 text-gray-900 bg-gray-100 p-4 rounded-2xl">
                     <span>Total:</span>
                     <span className="text-orange-600">${total().toFixed(2)}</span>
                 </div>
+                
                 <div className="grid grid-cols-4 gap-3 mb-4">
                     <button onClick={() => clearCart()} className="col-span-1 bg-red-100 text-red-600 font-black rounded-xl py-4 text-xs tracking-widest active:scale-95 transition-transform border border-red-200">BORRAR</button>
-                    <button onClick={submitOrder} disabled={isSubmitting} className="col-span-3 bg-green-600 text-white font-black rounded-xl text-xl shadow-xl hover:bg-green-700 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                    <button 
+                        onClick={submitOrder}
+                        disabled={isSubmitting}
+                        className="col-span-3 bg-green-600 text-white font-black rounded-xl text-xl shadow-xl hover:bg-green-700 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
                         {isSubmitting ? 'ENVIANDO...' : '🚀 ENVIAR ORDEN'}
                     </button>
                 </div>
@@ -348,8 +348,17 @@ export default function WaiterPage() {
       {cart.length > 0 && !showCheckout && (
         <div className="fixed bottom-0 left-0 right-0 z-40 p-4 bg-gradient-to-t from-gray-100 via-gray-100 to-transparent pt-10">
           <div className="max-w-md mx-auto">
-            <button onClick={() => { if(!selectedTable) { alert("⚠️ SELECCIONA UNA MESA ARRIBA"); window.scrollTo({top:0, behavior:'smooth'}); return; } setShowCheckout(true); }} className="w-full bg-gray-900 text-white font-bold py-5 rounded-2xl shadow-2xl flex justify-between px-6 border-4 border-gray-800 active:scale-[0.98] transition-transform">
-              <div className="flex items-center gap-3"><span className="bg-orange-500 px-4 py-1.5 rounded-full text-lg font-black">{cart.length}</span><span className="text-lg tracking-wide">VER COMANDA</span></div>
+            <button 
+                onClick={() => {
+                    if(!selectedTable) { alert("⚠️ SELECCIONA UNA MESA ARRIBA"); window.scrollTo({top:0, behavior:'smooth'}); return; }
+                    setShowCheckout(true);
+                }}
+                className="w-full bg-gray-900 text-white font-bold py-5 rounded-2xl shadow-2xl flex justify-between px-6 border-4 border-gray-800 active:scale-[0.98] transition-transform"
+            >
+              <div className="flex items-center gap-3">
+                <span className="bg-orange-500 px-4 py-1.5 rounded-full text-lg font-black">{cart.length}</span>
+                <span className="text-lg tracking-wide">VER COMANDA</span>
+              </div>
               <span className="text-2xl font-black text-orange-400">${total().toFixed(2)}</span>
             </button>
           </div>
