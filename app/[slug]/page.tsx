@@ -33,15 +33,31 @@ export default function MenuPage() {
   
   const { cart, addToCart, removeFromCart, total, clearCart } = useCartStore()
 
-  // 💡 NUEVO: LA REGLA INTELIGENTE PARA PUPUSAS
+  // 💡 NUEVO: LA REGLA INTELIGENTE AMPLIADA (Reconoce todas las categorías de pupusas)
   const isPupusaItem = (item: any) => {
     if (!item) return false;
     const catName = (item.category || '').toLowerCase();
     const itemName = (item.name || '').toLowerCase();
-    return catName.includes('pupusa') || itemName.includes('pupusa');
+    const pupusaKeywords = ['pupusa', 'tradicional', 'especial', 'mixta', 'internacional', 'loca', 'birria'];
+    return pupusaKeywords.some(kw => catName.includes(kw) || itemName.includes(kw));
   }
 
-  // 💡 NUEVO: RENDERIZADOR DE IMÁGENES/MONOGRAMAS
+  // 💡 NUEVO: ORDENADOR DE CATEGORÍAS (La Báscula)
+  const getCategoryWeight = (category: string) => {
+    const lower = String(category).toLowerCase();
+    if (lower.includes('tradicional')) return 1;
+    if (lower.includes('especial')) return 2;
+    if (lower.includes('mixta')) return 3;
+    if (lower.includes('internacional')) return 4;
+    if (lower.includes('loca')) return 5;
+    if (lower.includes('birria')) return 6;
+    if (lower.includes('pupusa')) return 7;
+    if (lower.includes('extra') || lower.includes('curtido')) return 8;
+    if (lower.includes('bebida') || lower.includes('fresco') || lower.includes('soda')) return 9;
+    if (lower.includes('postre') || lower.includes('dulce')) return 10;
+    return 11; // Otras categorías van al final
+  }
+
   const renderItemImage = (item: any, sizeClasses = "w-20 h-20", textClass = "text-4xl") => {
     const hasPhoto = item?.image_url && (item.image_url.startsWith('/') || item.image_url.startsWith('http'));
     const initial = item?.name ? item.name.charAt(0).toUpperCase() : '🍽️';
@@ -124,7 +140,7 @@ export default function MenuPage() {
 
   const addBulkToCart = () => {
     if (!selectedItem) return
-    if (isPupusaItem(selectedItem)) { // Usando regla inteligente
+    if (isPupusaItem(selectedItem)) { 
       for (let i = 0; i < countMaiz; i++) addToCart({ cartId: crypto.randomUUID(), id: selectedItem.id, name: selectedItem.name, price: selectedItem.price, dough: 'maiz' })
       for (let i = 0; i < countArroz; i++) addToCart({ cartId: crypto.randomUUID(), id: selectedItem.id, name: selectedItem.name, price: selectedItem.price, dough: 'arroz' })
     } else {
@@ -177,7 +193,10 @@ export default function MenuPage() {
   if (loading) return <div className="min-h-screen flex items-center justify-center"><p className="animate-bounce">🍽️ Cargando...</p></div>
   if (!restaurant) return <div className="min-h-screen flex items-center justify-center text-red-500">No encontrado</div>
 
-  // --- TRACKING PANTALLA ---
+  // CATEGORÍAS ORDENADAS (Aplicando la nueva regla)
+  const sortedCategories = Array.from(new Set(menu.map((item: any) => item.category)))
+    .sort((a: any, b: any) => getCategoryWeight(a) - getCategoryWeight(b) || a.localeCompare(b));
+
   if (activeOrderId) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6 text-center relative overflow-hidden">
@@ -203,7 +222,6 @@ export default function MenuPage() {
     )
   }
 
-  // --- RENDER NORMAL ---
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white pb-32 relative">
       <audio ref={audioRef} src="/ding.mp3" preload="auto" style={{ display: 'none' }} />
@@ -222,7 +240,8 @@ export default function MenuPage() {
       </div>
 
       <div className="max-w-2xl mx-auto p-5 space-y-8">
-        {Array.from(new Set(menu.map((item: any) => item.category))).map(category => {
+        {/* USAMOS LA LISTA ORDENADA INTELIGENTE */}
+        {sortedCategories.map(category => {
           const items = menu.filter((item: any) => item.category === category)
           if (items.length === 0) return null
           
@@ -233,7 +252,7 @@ export default function MenuPage() {
                 <div className="relative flex justify-center">
                   <span className="bg-gradient-to-b from-gray-50 to-white px-6 py-2 rounded-full border-2 border-gray-200 shadow-sm">
                     <h2 className="text-xl font-black text-gray-800 tracking-tight capitalize flex items-center gap-2">
-                      {String(category).toLowerCase().includes('pupusa') ? <><span className="text-2xl">🔥</span> {category as string}</> :
+                      {String(category).toLowerCase().includes('pupusa') || String(category).toLowerCase().includes('tradicional') || String(category).toLowerCase().includes('especial') || String(category).toLowerCase().includes('mixta') || String(category).toLowerCase().includes('loca') ? <><span className="text-2xl">🔥</span> {category as string}</> :
                        String(category).toLowerCase().includes('bebida') ? <><span className="text-2xl">🥤</span> {category as string}</> :
                        String(category).toLowerCase().includes('postre') ? <><span className="text-2xl">🍰</span> {category as string}</> :
                        <><span className="text-2xl">🍽️</span> {category as string}</>}
@@ -267,7 +286,6 @@ export default function MenuPage() {
       {showModal && selectedItem && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in">
           <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl animate-scale-up overflow-hidden border-2 border-gray-100">
-            {/* Modal Header con Foto/Monograma Inteligente */}
             <div className="relative bg-gradient-to-br from-orange-500 via-red-500 to-pink-500 p-8 text-white overflow-hidden flex items-center gap-5">
               <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
               {renderItemImage(selectedItem, "w-20 h-20 shadow-xl border-4 border-white/30 z-10", "text-4xl text-orange-500")}
@@ -280,11 +298,11 @@ export default function MenuPage() {
             <div className="p-6">
               {isPupusaItem(selectedItem) ? (
                 <div className="space-y-4 mb-6">
-                  <div className="relative overflow-hidden bg-gradient-to-br from-yellow-50 to-yellow-100 p-5 rounded-3xl border-2 border-yellow-300 shadow-lg">
+                  <div className="relative overflow-hidden bg-gradient-to-br from-yellow-50 via-amber-50 to-yellow-100 p-5 rounded-3xl border-2 border-yellow-300 shadow-lg">
                     <div className="relative flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         <div className="w-14 h-14 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-2xl flex items-center justify-center text-2xl shadow-lg">🌽</div>
-                        <div><span className="font-black text-yellow-900 text-xl block">Maíz</span></div>
+                        <div><span className="font-black text-yellow-900 text-xl block">Maíz</span><span className="text-xs text-yellow-700 font-semibold">Tradicional</span></div>
                       </div>
                       <div className="flex items-center gap-3 bg-white/80 backdrop-blur-sm rounded-2xl p-1 shadow-md">
                         <button onClick={() => setCountMaiz(Math.max(0, countMaiz - 1))} className="w-10 h-10 bg-white rounded-xl shadow-md text-xl font-bold text-gray-700 active:scale-95">−</button>
@@ -293,11 +311,11 @@ export default function MenuPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="relative overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 p-5 rounded-3xl border-2 border-gray-300 shadow-lg">
+                  <div className="relative overflow-hidden bg-gradient-to-br from-gray-50 via-slate-50 to-gray-100 p-5 rounded-3xl border-2 border-gray-300 shadow-lg">
                     <div className="relative flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         <div className="w-14 h-14 bg-white border-2 border-gray-400 rounded-2xl flex items-center justify-center text-2xl shadow-lg">🍚</div>
-                        <div><span className="font-black text-gray-800 text-xl block">Arroz</span></div>
+                        <div><span className="font-black text-gray-800 text-xl block">Arroz</span><span className="text-xs text-gray-600 font-semibold">Sabor único</span></div>
                       </div>
                       <div className="flex items-center gap-3 bg-white/80 backdrop-blur-sm rounded-2xl p-1 shadow-md">
                         <button onClick={() => setCountArroz(Math.max(0, countArroz - 1))} className="w-10 h-10 bg-white rounded-xl shadow-md text-xl font-bold text-gray-700 active:scale-95">−</button>
@@ -327,14 +345,13 @@ export default function MenuPage() {
         </div>
       )}
 
-      {/* CHECKOUT */}
       {showCheckout && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center z-50 animate-fade-in">
           <div className="bg-white rounded-t-[2rem] sm:rounded-[2rem] w-full max-w-md shadow-2xl animate-slide-up overflow-hidden border-2 border-gray-100 h-[90vh] flex flex-col">
             <div className="relative bg-gradient-to-br from-orange-500 via-red-500 to-pink-500 p-6 text-white shrink-0">
               <div className="relative z-10 flex justify-between items-start">
-                <div><h3 className="text-3xl font-black mb-1">Tu Orden</h3><p className="text-orange-100 font-medium">{cart.length} items</p></div>
-                <button onClick={() => clearCart()} className="flex items-center gap-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm px-4 py-2 rounded-xl font-bold text-sm shadow-lg">🗑️ Vaciar</button>
+                <div><h3 className="text-3xl font-black mb-1">Tu Orden</h3><p className="text-orange-100 font-medium">{cart.length} items en carrito</p></div>
+                <button onClick={() => clearCart()} className="flex items-center gap-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm px-4 py-2 rounded-xl transition-all font-bold text-sm shadow-lg active:scale-95"><span>🗑️</span><span>Vaciar</span></button>
               </div>
             </div>
 
@@ -348,9 +365,9 @@ export default function MenuPage() {
                       <span className="text-orange-600 font-black mt-2 text-lg">${group.totalPrice.toFixed(2)}</span>
                     </div>
                     <div className="flex items-center bg-gray-50 border-2 border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-                      <button onClick={() => decreaseQuantity(group)} className="w-10 h-10 flex items-center justify-center text-gray-600 font-bold hover:bg-gray-100 active:bg-gray-200">−</button>
+                      <button onClick={() => decreaseQuantity(group)} className="w-10 h-10 flex items-center justify-center text-gray-600 font-bold hover:bg-gray-100 active:bg-gray-200 transition-all">−</button>
                       <span className="w-12 text-center font-black text-xl bg-white">{group.quantity}</span>
-                      <button onClick={() => increaseQuantity(group)} className="w-10 h-10 flex items-center justify-center text-orange-600 font-bold hover:bg-orange-50 active:bg-orange-100">+</button>
+                      <button onClick={() => increaseQuantity(group)} className="w-10 h-10 flex items-center justify-center text-orange-600 font-bold hover:bg-orange-50 active:bg-orange-100 transition-all">+</button>
                     </div>
                   </div>
                 ))}
@@ -368,24 +385,21 @@ export default function MenuPage() {
                 <input type="text" placeholder="Ej: Mesa 4 o Juan Pérez" className="w-full border-2 border-gray-300 rounded-2xl p-5 text-base font-medium focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition-all shadow-sm" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
               </div>
 
-              <button onClick={submitOrder} disabled={isSubmitting || cart.length === 0} className="w-full bg-gradient-to-r from-green-500 via-emerald-500 to-green-600 text-white font-black py-5 rounded-2xl text-lg shadow-2xl hover:scale-[1.02] transition-all disabled:opacity-50 flex items-center justify-center gap-2 mb-3">
+              <button onClick={submitOrder} disabled={isSubmitting || cart.length === 0} className="w-full bg-gradient-to-r from-green-500 via-emerald-500 to-green-600 text-white font-black py-5 rounded-2xl text-lg shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2 mb-3">
                 {isSubmitting ? 'Enviando...' : '✅ Enviar a Cocina'}
               </button>
-              <button onClick={() => setShowCheckout(false)} className="w-full text-gray-500 py-4 font-semibold transition-colors">← Seguir pidiendo</button>
+              <button onClick={() => setShowCheckout(false)} className="w-full text-gray-500 py-4 hover:text-gray-700 font-semibold transition-colors">← Seguir pidiendo</button>
             </div>
           </div>
         </div>
       )}
 
       {cart.length > 0 && !showCheckout && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 p-4 animate-slide-up bg-gradient-to-t from-white via-white/80 to-transparent pt-10">
+        <div className="fixed bottom-0 left-0 right-0 z-40 p-4 animate-slide-up">
           <div className="max-w-2xl mx-auto">
-            <button onClick={() => setShowCheckout(true)} className="w-full bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 text-white font-black py-4 px-6 rounded-2xl flex justify-between items-center shadow-2xl hover:scale-[1.02] transition-all">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white/30 backdrop-blur-sm rounded-xl flex items-center justify-center"><span className="font-black text-lg">{cart.length}</span></div>
-                <span className="text-lg">🛒 Ver orden</span>
-              </div>
-              <span className="text-2xl font-black">${total().toFixed(2)}</span>
+            <button onClick={() => setShowCheckout(true)} className="relative w-full bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 text-white font-black py-4 px-6 rounded-2xl flex justify-between items-center shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all overflow-hidden">
+              <div className="relative flex items-center gap-3"><div className="w-10 h-10 bg-white/30 backdrop-blur-sm rounded-xl flex items-center justify-center shadow-lg"><span className="font-black text-lg">{cart.length}</span></div><span className="text-lg">🛒 Ver orden completa</span></div>
+              <div className="relative flex flex-col items-end"><span className="text-xs text-orange-100 font-bold uppercase tracking-wider">Total</span><span className="text-2xl font-black">${total().toFixed(2)}</span></div>
             </button>
           </div>
         </div>
@@ -393,11 +407,14 @@ export default function MenuPage() {
 
       <style jsx global>{`
         @keyframes scale-up { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
-        .animate-scale-up { animation: scale-up 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .animate-scale-up { animation: scale-up 0.3s ease-out; }
         @keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
-        .animate-slide-up { animation: slide-up 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .animate-slide-up { animation: slide-up 0.4s ease-out; }
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
         .animate-fade-in { animation: fade-in 0.3s ease-out; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: linear-gradient(to bottom, #f97316, #ef4444); border-radius: 10px; }
       `}</style>
     </div>
   )
