@@ -357,7 +357,7 @@ export default function WaiterPage() {
             >
               <div className="flex items-center gap-3">
                 <span className="bg-orange-500 px-4 py-1.5 rounded-full text-lg font-black">{cart.length}</span>
-                <span className="text-lg tracking-wide">VER COMANDA</span>
+                <span className="text-lg tracking-wide">VER ORDEN</span>
               </div>
               <span className="text-2xl font-black text-orange-400">${total().toFixed(2)}</span>
             </button>
