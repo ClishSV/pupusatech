@@ -271,6 +271,13 @@ export default function Dashboard() {
                     >
                       <span className="text-lg">👨‍🍳</span> IR A COCINA
                     </Link>
+
+                    <Link 
+                      href={`/${rest.slug}/despacho`}
+                      className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-black py-3.5 rounded-xl shadow-lg hover:shadow-blue-500/30 transition-all flex items-center justify-center gap-2 active:scale-95"
+                    >
+                      <span className="text-lg">🛍️</span> CAJA Y DESPACHO
+                    </Link>
                     
                     <div className="grid grid-cols-2 gap-3">
                       <Link href={`/${rest.slug}/mesero`} className="bg-gray-900 text-white font-bold py-3 rounded-xl text-center hover:bg-black transition-colors shadow-md active:scale-95 flex items-center justify-center gap-2 text-sm">

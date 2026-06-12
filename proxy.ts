@@ -31,7 +31,7 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const path = request.nextUrl.pathname
 
-  // ============================================================
+// ============================================================
   // 🛡️ REGLAS DE SEGURIDAD BLINDADAS
   // ============================================================
 
@@ -40,13 +40,13 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // 2. LA COCINA DE LA DEMO ES PÚBLICA (Para que puedas hacer demostraciones de ventas)
-  if (path === '/labendicion/admin') {
+  // 2. LA COCINA Y DESPACHO DE LA DEMO SON PÚBLICOS (Para demos)
+  if (path === '/labendicion/admin' || path === '/labendicion/despacho') {
     return response
   }
 
-  // 3. CUALQUIER OTRA RUTA DE ADMIN (De clientes reales) REQUIERE LOGIN
-  if (path.includes('/admin') && !user) {
+  // 3. CUALQUIER OTRA RUTA DE ADMIN/DESPACHO REQUIERE LOGIN
+  if ((path.includes('/admin') || path.includes('/despacho')) && !user) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
