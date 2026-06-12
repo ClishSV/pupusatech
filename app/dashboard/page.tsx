@@ -14,10 +14,15 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
   
-  // ESTADOS DEL CORTE Z
+  // ESTADOS DEL CORTE Z Y SEGURIDAD
   const [historyModalRest, setHistoryModalRest] = useState<any>(null)
   const [historyOrders, setHistoryOrders] = useState<any[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
+  
+  // 💡 NUEVOS ESTADOS PARA EL PIN DE SEGURIDAD
+  const [showPinModal, setShowPinModal] = useState(false)
+  const [pinInput, setPinInput] = useState('')
+  const [pendingRestForHistory, setPendingRestForHistory] = useState<any>(null)
 
   const router = useRouter()
   const supabase = createBrowserClient(
@@ -51,12 +56,27 @@ export default function Dashboard() {
     router.push('/')
   }
 
+  // --- 💡 LÓGICA DEL PIN DE SEGURIDAD ---
+  const verifyPinAndLoadHistory = (e: React.FormEvent) => {
+    e.preventDefault()
+    // Validamos el PIN ingresado contra el de la base de datos (por defecto '1234')
+    const correctPin = pendingRestForHistory?.admin_pin || '1234'
+    
+    if (pinInput === correctPin) {
+      setShowPinModal(false)
+      setPinInput('')
+      loadHistory(pendingRestForHistory) // Si es correcto, carga el dinero
+    } else {
+      alert("Código incorrecto ❌")
+      setPinInput('')
+    }
+  }
+
   // --- LÓGICA DE VENTAS (CORTE Z) ---
   const loadHistory = async (rest: any) => {
     setHistoryModalRest(rest)
     setLoadingHistory(true)
     
-    // Obtener inicio y fin de hoy
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const tomorrow = new Date(today)
@@ -234,9 +254,12 @@ export default function Dashboard() {
                   {/* BOTONES DE ADMINISTRACIÓN */}
                   <div className="mt-auto space-y-3">
                     
-                    {/* BOTÓN NUEVO: CORTE DE CAJA (El dueño ve el dinero) */}
+                    {/* BOTÓN NUEVO: CORTE DE CAJA CON PIN */}
                     <button 
-                      onClick={() => loadHistory(rest)}
+                      onClick={() => {
+                        setPendingRestForHistory(rest)
+                        setShowPinModal(true) // 💡 Abre el candado en lugar de cargar directo
+                      }}
                       className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 border-2 border-blue-200 font-black py-3.5 rounded-xl transition-colors flex items-center justify-center gap-2 active:scale-95"
                     >
                       <span className="text-lg">📊</span> VENTAS Y CORTE Z
@@ -266,13 +289,48 @@ export default function Dashboard() {
       </div>
 
       {/* ==========================================
-          MODAL: CORTE Z Y AUDITORÍA (Solo Dueño)
+          MODAL 1: PIN DE SEGURIDAD 🔒
+          ========================================== */}
+      {showPinModal && (
+        <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-xs shadow-2xl p-6 text-center animate-scale-up border-2 border-gray-100">
+            <div className="text-5xl mb-4">🔒</div>
+            <h3 className="text-2xl font-black text-gray-900 mb-2">Seguridad</h3>
+            <p className="text-sm text-gray-500 mb-6">Ingresa el PIN de dueño para ver el dinero en caja.</p>
+            
+            <form onSubmit={verifyPinAndLoadHistory}>
+              <input 
+                type="password" 
+                maxLength={4}
+                inputMode="numeric"
+                autoFocus
+                value={pinInput}
+                onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))} // Solo permite números
+                className="w-full text-center text-4xl tracking-[0.5em] font-black border-2 border-gray-200 rounded-2xl p-4 mb-4 focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition-all shadow-inner bg-gray-50"
+                placeholder="••••"
+              />
+              <button 
+                type="submit" 
+                disabled={pinInput.length < 4} 
+                className="w-full bg-gray-900 text-white font-black py-4 rounded-xl hover:bg-black transition-all disabled:opacity-50 active:scale-95"
+              >
+                Desbloquear
+              </button>
+            </form>
+            <button onClick={() => {setShowPinModal(false); setPinInput('');}} className="mt-4 text-sm text-gray-400 font-bold hover:text-gray-600">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL 2: CORTE Z Y AUDITORÍA
           ========================================== */}
       {historyModalRest && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex justify-end">
           <div className="bg-white w-full max-w-md h-full shadow-2xl flex flex-col animate-slide-left">
             
-            {/* Header */}
             <div className="bg-gray-900 p-6 text-white flex justify-between items-center shrink-0 border-b-4 border-blue-500">
               <div>
                 <h2 className="text-2xl font-black">Corte del Día</h2>
@@ -373,6 +431,10 @@ export default function Dashboard() {
       <style jsx global>{`
         @keyframes slide-left { from { transform: translateX(100%); } to { transform: translateX(0); } }
         .animate-slide-left { animation: slide-left 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+        .animate-fade-in { animation: fade-in 0.2s ease-out; }
+        @keyframes scale-up { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        .animate-scale-up { animation: scale-up 0.2s ease-out; }
       `}</style>
     </div>
   )
