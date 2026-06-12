@@ -21,9 +21,16 @@ export default function MenuPage() {
   const [selectedItem, setSelectedItem] = useState<any>(null)
   const [showModal, setShowModal] = useState(false)
   
+  // ESTADOS DE CHECKOUT Y DELIVERY 🛵
   const [showCheckout, setShowCheckout] = useState(false)
-  const [customerName, setCustomerName] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [orderType, setOrderType] = useState<'local' | 'takeout' | 'delivery'>('local')
+  
+  const [customerName, setCustomerName] = useState('')
+  const [customerPhone, setCustomerPhone] = useState('')
+  const [deliveryAddress, setDeliveryAddress] = useState('')
+  const [deliveryCoords, setDeliveryCoords] = useState<{lat: number, lng: number} | null>(null)
+  const [gettingLocation, setGettingLocation] = useState(false)
   
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null)
   const [orderStatus, setOrderStatus] = useState<string>('pending') 
@@ -33,7 +40,7 @@ export default function MenuPage() {
   
   const { cart, addToCart, removeFromCart, total, clearCart } = useCartStore()
 
-  // 💡 NUEVO: LA REGLA INTELIGENTE AMPLIADA (Reconoce todas las categorías de pupusas)
+  // REGLA INTELIGENTE DE PUPUSAS
   const isPupusaItem = (item: any) => {
     if (!item) return false;
     const catName = (item.category || '').toLowerCase();
@@ -42,7 +49,6 @@ export default function MenuPage() {
     return pupusaKeywords.some(kw => catName.includes(kw) || itemName.includes(kw));
   }
 
-  // 💡 NUEVO: ORDENADOR DE CATEGORÍAS (La Báscula)
   const getCategoryWeight = (category: string) => {
     const lower = String(category).toLowerCase();
     if (lower.includes('tradicional')) return 1;
@@ -55,7 +61,7 @@ export default function MenuPage() {
     if (lower.includes('extra') || lower.includes('curtido')) return 8;
     if (lower.includes('bebida') || lower.includes('fresco') || lower.includes('soda')) return 9;
     if (lower.includes('postre') || lower.includes('dulce')) return 10;
-    return 11; // Otras categorías van al final
+    return 11; 
   }
 
   const renderItemImage = (item: any, sizeClasses = "w-20 h-20", textClass = "text-4xl") => {
@@ -131,9 +137,7 @@ export default function MenuPage() {
     }
   }, [activeOrderId, audioUnlocked])
 
-  const handleItemClick = (item: any) => {
-    setSelectedItem(item); setCountMaiz(0); setCountArroz(0); setCountBebida(1); setShowModal(true)
-  }
+  const handleItemClick = (item: any) => { setSelectedItem(item); setCountMaiz(0); setCountArroz(0); setCountBebida(1); setShowModal(true) }
   const [countMaiz, setCountMaiz] = useState(0)
   const [countArroz, setCountArroz] = useState(0)
   const [countBebida, setCountBebida] = useState(1)
@@ -162,21 +166,59 @@ export default function MenuPage() {
   const increaseQuantity = (item: any) => addToCart({ cartId: crypto.randomUUID(), id: item.id, name: item.name, price: item.price, dough: item.dough })
   const decreaseQuantity = (item: any) => { const lastId = item.cartIds[item.cartIds.length - 1]; if (lastId) removeFromCart(lastId) }
 
+  // 💡 NUEVO: OBTENER GPS
+  const handleGetLocation = () => {
+    setGettingLocation(true)
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setDeliveryCoords({ lat: position.coords.latitude, lng: position.coords.longitude })
+          setGettingLocation(false)
+        },
+        () => {
+          alert('Por favor permite el acceso al GPS o revisa la configuración de tu celular.')
+          setGettingLocation(false)
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      )
+    } else {
+      alert('Tu navegador no soporta ubicación.')
+      setGettingLocation(false)
+    }
+  }
+
   const submitOrder = async () => {
-    if (!customerName.trim()) { alert("Nombre requerido"); return }
+    // Validaciones
+    if (orderType !== 'delivery' && !customerName.trim()) { alert("Ingresa tu nombre o mesa"); return }
+    if (orderType === 'delivery') {
+      if (!customerName.trim() || !customerPhone.trim() || !deliveryAddress.trim()) {
+        alert("Por favor llena todos los datos para el envío"); return;
+      }
+      if (!deliveryCoords) {
+        alert("📍 Usa el botón para capturar tu ubicación GPS para el motorista."); return;
+      }
+    }
     
     if (audioRef.current && !audioUnlocked) {
       try {
-        await audioRef.current.play()
-        audioRef.current.pause()
-        audioRef.current.currentTime = 0
-        setAudioUnlocked(true)
-      } catch (err) { console.warn("Audio no desbloqueado:", err) }
+        await audioRef.current.play(); audioRef.current.pause(); audioRef.current.currentTime = 0; setAudioUnlocked(true)
+      } catch (err) { console.warn(err) }
     }
 
     setIsSubmitting(true)
     const { data, error } = await supabase.from('orders').insert({
-      restaurant_id: restaurant.id, table_number: customerName, status: 'pending', total: total(), items: cart
+      restaurant_id: restaurant.id, 
+      table_number: customerName, 
+      order_type: orderType, // Guardamos el tipo de orden
+      customer_info: {       // Guardamos la info del cliente
+        name: customerName,
+        phone: customerPhone,
+        address: deliveryAddress,
+        coords: deliveryCoords
+      },
+      status: 'pending', 
+      total: total(), 
+      items: cart
     }).select().single()
 
     setIsSubmitting(false)
@@ -193,7 +235,6 @@ export default function MenuPage() {
   if (loading) return <div className="min-h-screen flex items-center justify-center"><p className="animate-bounce">🍽️ Cargando...</p></div>
   if (!restaurant) return <div className="min-h-screen flex items-center justify-center text-red-500">No encontrado</div>
 
-  // CATEGORÍAS ORDENADAS (Aplicando la nueva regla)
   const sortedCategories = Array.from(new Set(menu.map((item: any) => item.category)))
     .sort((a: any, b: any) => getCategoryWeight(a) - getCategoryWeight(b) || a.localeCompare(b));
 
@@ -207,13 +248,13 @@ export default function MenuPage() {
             <><div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse border-4 border-blue-100"><span className="text-4xl">📨</span></div><h2 className="text-2xl font-black text-gray-800 mb-2">¡Orden Enviada!</h2><p className="text-gray-500 mb-8 font-medium">Tu pedido fue recibido. <br/> Espera a que la cocina confirme.</p><div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden"><div className="bg-blue-500 h-2 rounded-full w-1/3 animate-progress-indeterminate"></div></div></>
           )}
           {orderStatus === 'cooking' && (
-            <><div className="w-24 h-24 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-orange-200"><span className="text-4xl animate-bounce">🔥</span></div><h2 className="text-2xl font-black text-gray-800 mb-2">¡Orden Aceptada!</h2><p className="text-gray-500 mb-8">Tus pupusas ya están en la plancha. Relájate.</p><div className="w-full bg-gray-200 rounded-full h-2"><div className="bg-orange-500 h-2 rounded-full w-2/3 transition-all duration-1000"></div></div></>
+            <><div className="w-24 h-24 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-orange-200"><span className="text-4xl animate-bounce">🔥</span></div><h2 className="text-2xl font-black text-gray-800 mb-2">¡Orden Aceptada!</h2><p className="text-gray-500 mb-8">Estamos preparando tu pedido con amor.</p><div className="w-full bg-gray-200 rounded-full h-2"><div className="bg-orange-500 h-2 rounded-full w-2/3 transition-all duration-1000"></div></div></>
           )}
           {orderStatus === 'ready' && (
-            <><div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 animate-scale-up border-4 border-green-200"><span className="text-4xl">✅</span></div><h2 className="text-2xl font-black text-gray-800 mb-2">¡Orden Lista!</h2><p className="text-gray-600 mb-8">Ya puedes pasar a recoger o esperar al mesero.</p><div className="w-full bg-gray-200 rounded-full h-2"><div className="bg-green-500 h-2 rounded-full w-full"></div></div></>
+            <><div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 animate-scale-up border-4 border-green-200"><span className="text-4xl">✅</span></div><h2 className="text-2xl font-black text-gray-800 mb-2">¡Orden Lista!</h2><p className="text-gray-600 mb-8">Tu pedido está listo para entregar/recoger.</p><div className="w-full bg-gray-200 rounded-full h-2"><div className="bg-green-500 h-2 rounded-full w-full"></div></div></>
           )}
           {(orderStatus === 'delivered' || orderStatus === 'cancelled') && (
-             <div className="mt-4"><div className="text-5xl mb-4">👋</div><h3 className="text-xl font-bold text-gray-800 mb-2">Orden Finalizada</h3><p className="text-gray-500 mb-6 text-sm">Gracias por tu visita.</p><button onClick={() => { setActiveOrderId(null); localStorage.removeItem('activeOrderId') }} className="bg-gray-900 text-white font-bold py-3 px-6 rounded-xl w-full hover:bg-black transition shadow-lg">Hacer nuevo pedido</button></div>
+             <div className="mt-4"><div className="text-5xl mb-4">👋</div><h3 className="text-xl font-bold text-gray-800 mb-2">Orden Finalizada</h3><p className="text-gray-500 mb-6 text-sm">Gracias por tu preferencia.</p><button onClick={() => { setActiveOrderId(null); localStorage.removeItem('activeOrderId') }} className="bg-gray-900 text-white font-bold py-3 px-6 rounded-xl w-full hover:bg-black transition shadow-lg">Hacer nuevo pedido</button></div>
           )}
         </div>
         {orderStatus !== 'delivered' && orderStatus !== 'cancelled' && (<p className="relative z-10 mt-8 text-xs text-gray-400">ID Pedido: <span className="font-mono bg-white/50 px-2 py-1 rounded">{activeOrderId?.slice(0,8)}</span></p>)}
@@ -240,7 +281,6 @@ export default function MenuPage() {
       </div>
 
       <div className="max-w-2xl mx-auto p-5 space-y-8">
-        {/* USAMOS LA LISTA ORDENADA INTELIGENTE */}
         {sortedCategories.map(category => {
           const items = menu.filter((item: any) => item.category === category)
           if (items.length === 0) return null
@@ -252,7 +292,7 @@ export default function MenuPage() {
                 <div className="relative flex justify-center">
                   <span className="bg-gradient-to-b from-gray-50 to-white px-6 py-2 rounded-full border-2 border-gray-200 shadow-sm">
                     <h2 className="text-xl font-black text-gray-800 tracking-tight capitalize flex items-center gap-2">
-                      {String(category).toLowerCase().includes('pupusa') || String(category).toLowerCase().includes('tradicional') || String(category).toLowerCase().includes('especial') || String(category).toLowerCase().includes('mixta') || String(category).toLowerCase().includes('loca') ? <><span className="text-2xl">🔥</span> {category as string}</> :
+                      {String(category).toLowerCase().includes('pupusa') || String(category).toLowerCase().includes('tradicional') || String(category).toLowerCase().includes('especial') || String(category).toLowerCase().includes('mixta') || String(category).toLowerCase().includes('loca') || String(category).toLowerCase().includes('birria') ? <><span className="text-2xl">🔥</span> {category as string}</> :
                        String(category).toLowerCase().includes('bebida') ? <><span className="text-2xl">🥤</span> {category as string}</> :
                        String(category).toLowerCase().includes('postre') ? <><span className="text-2xl">🍰</span> {category as string}</> :
                        <><span className="text-2xl">🍽️</span> {category as string}</>}
@@ -298,11 +338,11 @@ export default function MenuPage() {
             <div className="p-6">
               {isPupusaItem(selectedItem) ? (
                 <div className="space-y-4 mb-6">
-                  <div className="relative overflow-hidden bg-gradient-to-br from-yellow-50 via-amber-50 to-yellow-100 p-5 rounded-3xl border-2 border-yellow-300 shadow-lg">
+                  <div className="relative overflow-hidden bg-gradient-to-br from-yellow-50 to-yellow-100 p-5 rounded-3xl border-2 border-yellow-300 shadow-lg">
                     <div className="relative flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         <div className="w-14 h-14 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-2xl flex items-center justify-center text-2xl shadow-lg">🌽</div>
-                        <div><span className="font-black text-yellow-900 text-xl block">Maíz</span><span className="text-xs text-yellow-700 font-semibold">Tradicional</span></div>
+                        <div><span className="font-black text-yellow-900 text-xl block">Maíz</span></div>
                       </div>
                       <div className="flex items-center gap-3 bg-white/80 backdrop-blur-sm rounded-2xl p-1 shadow-md">
                         <button onClick={() => setCountMaiz(Math.max(0, countMaiz - 1))} className="w-10 h-10 bg-white rounded-xl shadow-md text-xl font-bold text-gray-700 active:scale-95">−</button>
@@ -311,11 +351,11 @@ export default function MenuPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="relative overflow-hidden bg-gradient-to-br from-gray-50 via-slate-50 to-gray-100 p-5 rounded-3xl border-2 border-gray-300 shadow-lg">
+                  <div className="relative overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 p-5 rounded-3xl border-2 border-gray-300 shadow-lg">
                     <div className="relative flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         <div className="w-14 h-14 bg-white border-2 border-gray-400 rounded-2xl flex items-center justify-center text-2xl shadow-lg">🍚</div>
-                        <div><span className="font-black text-gray-800 text-xl block">Arroz</span><span className="text-xs text-gray-600 font-semibold">Sabor único</span></div>
+                        <div><span className="font-black text-gray-800 text-xl block">Arroz</span></div>
                       </div>
                       <div className="flex items-center gap-3 bg-white/80 backdrop-blur-sm rounded-2xl p-1 shadow-md">
                         <button onClick={() => setCountArroz(Math.max(0, countArroz - 1))} className="w-10 h-10 bg-white rounded-xl shadow-md text-xl font-bold text-gray-700 active:scale-95">−</button>
@@ -345,61 +385,142 @@ export default function MenuPage() {
         </div>
       )}
 
+      {/* CHECKOUT MODIFICADO PARA DELIVERY */}
       {showCheckout && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center z-50 animate-fade-in">
-          <div className="bg-white rounded-t-[2rem] sm:rounded-[2rem] w-full max-w-md shadow-2xl animate-slide-up overflow-hidden border-2 border-gray-100 h-[90vh] flex flex-col">
-            <div className="relative bg-gradient-to-br from-orange-500 via-red-500 to-pink-500 p-6 text-white shrink-0">
+          <div className="bg-white rounded-t-[2rem] sm:rounded-[2rem] w-full max-w-md shadow-2xl animate-slide-up overflow-hidden border-2 border-gray-100 h-[95vh] flex flex-col">
+            <div className="relative bg-gradient-to-br from-gray-900 to-gray-800 p-6 text-white shrink-0">
               <div className="relative z-10 flex justify-between items-start">
-                <div><h3 className="text-3xl font-black mb-1">Tu Orden</h3><p className="text-orange-100 font-medium">{cart.length} items en carrito</p></div>
-                <button onClick={() => clearCart()} className="flex items-center gap-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm px-4 py-2 rounded-xl transition-all font-bold text-sm shadow-lg active:scale-95"><span>🗑️</span><span>Vaciar</span></button>
+                <div><h3 className="text-3xl font-black mb-1">Tu Orden</h3><p className="text-gray-300 font-medium">{cart.length} items en carrito</p></div>
+                <button onClick={() => clearCart()} className="flex items-center gap-2 bg-white/10 hover:bg-red-500/80 backdrop-blur-sm px-4 py-2 rounded-xl transition-all font-bold text-sm shadow-lg"><span>🗑️</span></button>
               </div>
             </div>
 
-            <div className="p-6 overflow-y-auto flex-1">
-              <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-3xl mb-5 space-y-3 border-2 border-gray-200">
+            <div className="p-4 overflow-y-auto flex-1 bg-gray-50 space-y-5">
+              
+              {/* SELECTOR DE TIPO DE ORDEN */}
+              <div className="bg-white p-1.5 rounded-2xl flex shadow-sm border border-gray-200">
+                <button 
+                  onClick={() => setOrderType('local')} 
+                  className={`flex-1 py-3 text-xs sm:text-sm font-black rounded-xl transition-all ${orderType === 'local' ? 'bg-orange-100 text-orange-700 shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
+                >
+                  🍽️ LOCAL
+                </button>
+                <button 
+                  onClick={() => setOrderType('takeout')} 
+                  className={`flex-1 py-3 text-xs sm:text-sm font-black rounded-xl transition-all ${orderType === 'takeout' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
+                >
+                  🛍️ LLEVAR
+                </button>
+                <button 
+                  onClick={() => setOrderType('delivery')} 
+                  className={`flex-1 py-3 text-xs sm:text-sm font-black rounded-xl transition-all ${orderType === 'delivery' ? 'bg-purple-100 text-purple-700 shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
+                >
+                  🛵 A DOMICILIO
+                </button>
+              </div>
+
+              {/* LISTA DE ITEMS */}
+              <div className="bg-white p-4 rounded-3xl space-y-3 border border-gray-100 shadow-sm">
                 {getGroupedCart().map((group: any) => (
-                  <div key={group.id + group.dough} className="bg-white p-4 rounded-2xl flex justify-between items-center shadow-md border border-gray-100">
+                  <div key={group.id + group.dough} className="flex justify-between items-center border-b border-gray-50 pb-3 last:border-0 last:pb-0">
                     <div className="flex flex-col flex-1">
-                      <span className="font-bold text-gray-900 text-base mb-1">{group.name}</span>
-                      <span className="text-gray-500 text-xs uppercase font-bold tracking-wide">{group.dough ? `🌽 ${group.dough}` : ''}</span>
-                      <span className="text-orange-600 font-black mt-2 text-lg">${group.totalPrice.toFixed(2)}</span>
+                      <span className="font-bold text-gray-900 text-sm mb-1">{group.name}</span>
+                      {group.dough && <span className="text-gray-500 text-[10px] uppercase font-bold tracking-wide">🌽 {group.dough}</span>}
+                      <span className="text-orange-600 font-black mt-1">${group.totalPrice.toFixed(2)}</span>
                     </div>
-                    <div className="flex items-center bg-gray-50 border-2 border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-                      <button onClick={() => decreaseQuantity(group)} className="w-10 h-10 flex items-center justify-center text-gray-600 font-bold hover:bg-gray-100 active:bg-gray-200 transition-all">−</button>
-                      <span className="w-12 text-center font-black text-xl bg-white">{group.quantity}</span>
-                      <button onClick={() => increaseQuantity(group)} className="w-10 h-10 flex items-center justify-center text-orange-600 font-bold hover:bg-orange-50 active:bg-orange-100 transition-all">+</button>
+                    <div className="flex items-center bg-gray-50 border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                      <button onClick={() => decreaseQuantity(group)} className="w-8 h-8 flex items-center justify-center text-gray-600 font-bold hover:bg-gray-200">−</button>
+                      <span className="w-8 text-center font-black text-sm bg-white">{group.quantity}</span>
+                      <button onClick={() => increaseQuantity(group)} className="w-8 h-8 flex items-center justify-center text-orange-600 font-bold hover:bg-orange-100">+</button>
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className="relative overflow-hidden bg-gradient-to-br from-orange-50 via-red-50 to-pink-50 p-5 rounded-3xl mb-5 border-2 border-orange-200 shadow-lg">
-                <div className="relative flex justify-between items-center">
-                  <span className="text-gray-700 font-bold text-xl">Total a pagar:</span>
-                  <span className="text-orange-600 font-black text-4xl">${total().toFixed(2)}</span>
+              {/* FORMULARIOS DINÁMICOS SEGÚN EL TIPO DE ORDEN */}
+              <div className="bg-white p-5 rounded-3xl border border-gray-200 shadow-sm space-y-4">
+                
+                {/* CAMPO COMÚN: NOMBRE */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+                    {orderType === 'local' ? '👤 Nombre o Número de Mesa' : '👤 Tu Nombre'}
+                  </label>
+                  <input type="text" placeholder={orderType === 'local' ? "Ej: Mesa 4 o Juan" : "Ej: Carlos López"} className="w-full border-2 border-gray-200 rounded-xl p-4 font-bold focus:border-orange-500 outline-none" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
                 </div>
+
+                {/* CAMPOS EXTRA PARA DELIVERY */}
+                {orderType === 'delivery' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">📞 Teléfono (WhatsApp)</label>
+                      <input type="tel" placeholder="Ej: 7777-8888" className="w-full border-2 border-gray-200 rounded-xl p-4 font-bold focus:border-purple-500 outline-none" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">🏠 Dirección Exacta y Referencia</label>
+                      <textarea placeholder="Ej: Col. Escalón, Casa #4. Portón negro frente al parque." className="w-full border-2 border-gray-200 rounded-xl p-4 font-bold focus:border-purple-500 outline-none h-24 resize-none" value={deliveryAddress} onChange={(e) => setDeliveryAddress(e.target.value)} />
+                    </div>
+
+                    <div className="pt-2">
+                      <button 
+                        onClick={handleGetLocation}
+                        className={`w-full py-4 rounded-xl font-black text-sm flex items-center justify-center gap-2 transition-all ${
+                          deliveryCoords ? 'bg-green-100 text-green-700 border-2 border-green-500' : 'bg-gray-900 text-white hover:bg-gray-800 shadow-lg'
+                        }`}
+                      >
+                        {gettingLocation ? '📍 Obteniendo GPS...' : 
+                         deliveryCoords ? '✅ Ubicación Capturada' : 
+                         '📍 Usar mi ubicación GPS (Obligatorio)'}
+                      </button>
+                      <p className="text-[10px] text-gray-400 text-center mt-2 font-medium">
+                        El motorista usará este GPS para llegar a ti con Waze/Maps.
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
 
-              <div className="mb-5">
-                <label className="flex items-center gap-2 text-sm font-black text-gray-700 mb-3"><span className="text-lg">📍</span><span>Identifícate</span></label>
-                <input type="text" placeholder="Ej: Mesa 4 o Juan Pérez" className="w-full border-2 border-gray-300 rounded-2xl p-5 text-base font-medium focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition-all shadow-sm" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
-              </div>
+            </div>
 
-              <button onClick={submitOrder} disabled={isSubmitting || cart.length === 0} className="w-full bg-gradient-to-r from-green-500 via-emerald-500 to-green-600 text-white font-black py-5 rounded-2xl text-lg shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2 mb-3">
-                {isSubmitting ? 'Enviando...' : '✅ Enviar a Cocina'}
+            {/* FOOTER DEL CHECKOUT */}
+            <div className="p-5 bg-white border-t border-gray-100 shrink-0">
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-gray-500 font-bold text-sm uppercase tracking-widest">Subtotal:</span>
+                <span className="text-gray-900 font-black text-3xl">${total().toFixed(2)}</span>
+              </div>
+              
+              {orderType === 'delivery' && (
+                <div className="bg-purple-50 p-3 rounded-xl mb-4 border border-purple-100 text-center">
+                  <p className="text-xs text-purple-700 font-bold">🛵 El costo de envío se confirmará por WhatsApp.</p>
+                </div>
+              )}
+
+              <button 
+                onClick={submitOrder} 
+                disabled={isSubmitting || cart.length === 0} 
+                className={`w-full text-white font-black py-5 rounded-2xl text-xl shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2 ${
+                  orderType === 'delivery' ? 'bg-gradient-to-r from-purple-600 to-indigo-600' : 'bg-gradient-to-r from-green-500 to-emerald-600'
+                }`}
+              >
+                {isSubmitting ? 'Enviando...' : (orderType === 'delivery' ? '🛵 PEDIR A DOMICILIO' : '✅ CONFIRMAR ORDEN')}
               </button>
-              <button onClick={() => setShowCheckout(false)} className="w-full text-gray-500 py-4 hover:text-gray-700 font-semibold transition-colors">← Seguir pidiendo</button>
+              
+              <button onClick={() => setShowCheckout(false)} className="w-full text-gray-400 py-3 mt-2 font-bold hover:text-gray-600 transition-colors">Volver al Menú</button>
             </div>
           </div>
         </div>
       )}
 
       {cart.length > 0 && !showCheckout && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 p-4 animate-slide-up">
+        <div className="fixed bottom-0 left-0 right-0 z-40 p-4 animate-slide-up bg-gradient-to-t from-white via-white/80 to-transparent pt-10">
           <div className="max-w-2xl mx-auto">
-            <button onClick={() => setShowCheckout(true)} className="relative w-full bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 text-white font-black py-4 px-6 rounded-2xl flex justify-between items-center shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all overflow-hidden">
-              <div className="relative flex items-center gap-3"><div className="w-10 h-10 bg-white/30 backdrop-blur-sm rounded-xl flex items-center justify-center shadow-lg"><span className="font-black text-lg">{cart.length}</span></div><span className="text-lg">🛒 Ver orden completa</span></div>
-              <div className="relative flex flex-col items-end"><span className="text-xs text-orange-100 font-bold uppercase tracking-wider">Total</span><span className="text-2xl font-black">${total().toFixed(2)}</span></div>
+            <button onClick={() => setShowCheckout(true)} className="w-full bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 text-white font-black py-4 px-6 rounded-2xl flex justify-between items-center shadow-2xl hover:scale-[1.02] transition-all">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/30 backdrop-blur-sm rounded-xl flex items-center justify-center"><span className="font-black text-lg">{cart.length}</span></div>
+                <span className="text-lg">🛒 Ver orden</span>
+              </div>
+              <span className="text-2xl font-black">${total().toFixed(2)}</span>
             </button>
           </div>
         </div>
@@ -407,14 +528,11 @@ export default function MenuPage() {
 
       <style jsx global>{`
         @keyframes scale-up { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
-        .animate-scale-up { animation: scale-up 0.3s ease-out; }
+        .animate-scale-up { animation: scale-up 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
         @keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
-        .animate-slide-up { animation: slide-up 0.4s ease-out; }
+        .animate-slide-up { animation: slide-up 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
         .animate-fade-in { animation: fade-in 0.3s ease-out; }
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb { background: linear-gradient(to bottom, #f97316, #ef4444); border-radius: 10px; }
       `}</style>
     </div>
   )

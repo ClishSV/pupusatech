@@ -11,7 +11,6 @@ export default function KitchenPage() {
   const params = useParams()
   const slug = params?.slug as string
 
-  // --- ESTADOS BASE ---
   const [orders, setOrders] = useState<any[]>([])
   const [restaurant, setRestaurant] = useState<any>(null)
   
@@ -31,7 +30,6 @@ export default function KitchenPage() {
     return Object.values(grouped)
   }
 
-  // --- SONIDO ---
   const playNotificationSound = () => {
     if (!audioRef.current) return
     audioRef.current.currentTime = 0
@@ -50,45 +48,23 @@ export default function KitchenPage() {
     }).catch(e => console.error(e))
   }
 
-  // --- IMPRESIÓN DE TICKET DE COMANDA ---
-  const printTicket = (order: any) => {
-    const items = groupItems(order.items)
-    const printWindow = window.open('', '', 'width=300,height=600')
-    if (!printWindow) return
+  // 💡 NUEVO: ENVIAR A MOTORISTA POR WHATSAPP
+  const sendToDriver = (order: any) => {
+    const info = order.customer_info || {};
+    const coordsStr = info.coords ? `${info.coords.lat},${info.coords.lng}` : '';
+    
+    const text = `🛵 *NUEVO VIAJE - PUPUSATECH* 🛵\n\n` +
+                 `👤 *Cliente:* ${info.name || order.table_number}\n` +
+                 `📞 *Teléfono:* ${info.phone || 'No provisto'}\n` +
+                 `💰 *Cobrar:* $${order.total.toFixed(2)} (Más tu envío)\n\n` +
+                 `🏠 *Referencia:* ${info.address || 'No provista'}\n` +
+                 (coordsStr ? `📍 *Ubicación GPS:* https://waze.com/ul?ll=${coordsStr}&navigate=yes` : '');
 
-    printWindow.document.write(`
-      <html>
-        <head>
-          <style>
-            body { font-family: 'Courier New', monospace; width: 58mm; font-size: 12px; margin: 0; padding: 5px; }
-            .header { text-align: center; margin-bottom: 10px; border-bottom: 1px dashed black; padding-bottom: 5px; }
-            .title { font-size: 16px; font-weight: bold; }
-            .item { display: flex; justify-content: space-between; margin-bottom: 5px; }
-            .qty { font-weight: bold; margin-right: 5px; }
-            .total { border-top: 1px dashed black; margin-top: 10px; padding-top: 5px; text-align: right; font-size: 14px; font-weight: bold; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="title">${restaurant.name}</div>
-            <div>Mesa: ${order.table_number}</div>
-            <div>${new Date(order.created_at).toLocaleTimeString()}</div>
-          </div>
-          ${items.map((item: any) => `
-            <div class="item">
-              <div><span class="qty">${item.quantity}x</span>${item.name} <br/><small>${item.dough ? item.dough.toUpperCase() : ''}</small></div>
-              <div>$${(item.price * item.quantity).toFixed(2)}</div>
-            </div>
-          `).join('')}
-          <div class="total">Total: $${order.total.toFixed(2)}</div>
-          <br/><br/>.
-        </body>
-      </html>
-    `)
-    printWindow.document.close(); printWindow.focus(); printWindow.print(); printWindow.close()
+    const encodedText = encodeURIComponent(text);
+    // Abrir WhatsApp
+    window.open(`https://wa.me/?text=${encodedText}`, '_blank');
   }
 
-  // --- CARGAR DATOS EN VIVO ---
   useEffect(() => {
     audioRef.current = new Audio(NOTIFICATION_SOUND)
 
@@ -129,7 +105,6 @@ export default function KitchenPage() {
     fetchInitialData()
   }, [slug])
 
-  // --- ACTUALIZAR ESTADO (2 TOQUES) ---
   const updateStatus = async (orderId: string, newStatus: string) => {
     if (newStatus === 'delivered' || newStatus === 'cancelled') {
       setOrders(prev => prev.filter(o => o.id !== orderId))
@@ -200,23 +175,46 @@ export default function KitchenPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {orders.map((order) => (
+          {orders.map((order) => {
+            // 💡 ESTILOS DINÁMICOS SEGÚN TIPO DE ORDEN
+            const isDelivery = order.order_type === 'delivery';
+            const isTakeout = order.order_type === 'takeout';
+            const customerInfo = order.customer_info || {};
+
+            return (
             <div 
               key={order.id} 
               className={`bg-white rounded-2xl shadow-md overflow-hidden border-2 transition-all flex flex-col hover:shadow-xl ${
                 order.status === 'pending' ? 'border-gray-800' : 'border-green-500'
-              }`}
+              } ${isDelivery ? 'ring-4 ring-purple-500/30' : ''}`}
             >
-              <div className={`p-4 text-white flex justify-between items-center ${order.status === 'pending' ? 'bg-gray-900' : 'bg-green-600'}`}>
+              {/* CABECERA DINÁMICA */}
+              <div className={`p-4 text-white flex justify-between items-start ${
+                 order.status === 'pending' ? (isDelivery ? 'bg-purple-900' : 'bg-gray-900') : 'bg-green-600'
+              }`}>
                 <div className="flex flex-col">
-                  <span className="font-black text-2xl tracking-tighter">{order.table_number}</span>
-                  <span className="text-[10px] uppercase font-bold tracking-widest opacity-80">{order.status === 'pending' ? '⏳ POR CONFIRMAR' : '🔥 EN PLANCHA'}</span>
+                  {/* Título de la Orden */}
+                  <span className="font-black text-xl tracking-tight leading-tight">
+                    {isDelivery ? `🛵 Domicilio` : isTakeout ? `🛍️ Llevar` : order.table_number}
+                  </span>
+                  
+                  {/* Nombre si no es mesa local */}
+                  {(isDelivery || isTakeout) && (
+                    <span className="text-sm font-bold text-white/90 mt-1">
+                      👤 {customerInfo.name || order.table_number}
+                    </span>
+                  )}
+
+                  <span className="text-[10px] uppercase font-bold tracking-widest opacity-80 mt-2">
+                    {order.status === 'pending' ? '⏳ POR CONFIRMAR' : '🔥 EN PLANCHA'}
+                  </span>
                 </div>
-                <div className="text-right">
+                <div className="text-right shrink-0">
                   <div className="text-xs font-bold bg-white/20 px-2 py-1 rounded backdrop-blur-sm">{formatTime(order.created_at)}</div>
                 </div>
               </div>
 
+              {/* LISTA DE ITEMS */}
               <div className="p-4 space-y-3 flex-1 overflow-y-auto max-h-80 bg-gray-50/50">
                 {groupItems(order.items).map((item: any, index: number) => (
                   <div key={index} className="flex justify-between items-center p-3 rounded-xl bg-white border border-gray-100 shadow-sm">
@@ -236,6 +234,7 @@ export default function KitchenPage() {
                 ))}
               </div>
 
+              {/* FOOTER ACCIONES */}
               <div className="p-4 bg-white border-t border-gray-100 space-y-3">
                 {order.status === 'pending' && (
                   <div className="grid grid-cols-2 gap-3">
@@ -247,11 +246,20 @@ export default function KitchenPage() {
                     </button>
                   </div>
                 )}
+                
                 {order.status === 'cooking' && (
                   <div className="flex flex-col gap-3">
-                    <button onClick={() => printTicket(order)} className="w-full bg-white border-2 border-gray-200 text-gray-600 font-bold py-2.5 rounded-xl hover:bg-gray-50 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wide active:scale-95">
-                      🖨️ Imprimir Ticket
-                    </button>
+                    
+                    {/* 💡 BOTÓN WHATSAPP PARA MOTORISTA (SOLO DELIVERY) */}
+                    {isDelivery && (
+                      <button 
+                        onClick={() => sendToDriver(order)}
+                        className="w-full bg-[#25D366] hover:bg-[#1DA851] text-white font-bold py-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-sm active:scale-95"
+                      >
+                        📲 Enviar a Motorista Waze
+                      </button>
+                    )}
+
                     <button onClick={() => updateStatus(order.id, 'delivered')} className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-green-200 transition-all transform active:scale-95 text-xs uppercase tracking-wide">
                       ✅ Entregar y Archivar
                     </button>
@@ -259,7 +267,7 @@ export default function KitchenPage() {
                 )}
               </div>
             </div>
-          ))}
+          )})}
         </div>
       )}
     </div>
