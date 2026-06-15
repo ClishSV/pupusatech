@@ -43,11 +43,21 @@ export default function DespachoPage() {
     }).catch(e => console.error(e))
   }
 
-  // --- IMPRESIÓN ---
+  // 💡 CÁLCULO DE HORA PROMESA
+  const getTargetTime = (created_at: string, wait_time: number | undefined) => {
+    if (!wait_time) return null;
+    const d = new Date(new Date(created_at).getTime() + wait_time * 60000);
+    return d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // --- IMPRESIÓN CON HORA PROMESA ---
   const printTicket = (order: any) => {
     const items = groupItems(order.items)
     const shortCode = order.id.slice(0,4).toUpperCase()
     const fee = order.customer_info?.delivery_fee || 0
+    const waitTime = order.customer_info?.wait_time
+    const targetTime = getTargetTime(order.created_at, waitTime)
+
     const printWindow = window.open('', '', 'width=300,height=600')
     if (!printWindow) return
 
@@ -69,7 +79,8 @@ export default function DespachoPage() {
             <div class="title">${restaurant.name}</div>
             <div class="code">ORDEN #${shortCode}</div>
             <div>Mesa/Cliente: ${order.table_number}</div>
-            <div>${new Date(order.created_at).toLocaleTimeString()}</div>
+            <div>Hora Pedido: ${new Date(order.created_at).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })}</div>
+            ${targetTime ? `<div style="font-size: 14px; font-weight: black; border-top: 1px solid black; margin-top: 5px; padding-top: 5px;">⏱️ Promesa: ${targetTime} (${waitTime} min)</div>` : ''}
           </div>
           ${items.map((item: any) => `
             <div class="item">
@@ -174,7 +185,6 @@ export default function DespachoPage() {
     fetchInitialData()
   }, [slug])
 
-  // --- FINALIZAR Y COBRAR ---
   const deliverOrder = async (orderId: string) => {
     setOrders(prev => prev.filter(o => o.id !== orderId))
     await supabase.from('orders').update({ status: 'delivered' }).eq('id', orderId)
@@ -226,6 +236,8 @@ export default function DespachoPage() {
             
             const deliveryFee = customerInfo.delivery_fee;
             const hasFee = deliveryFee !== undefined && deliveryFee !== null;
+            
+            const targetTime = getTargetTime(order.created_at, customerInfo.wait_time);
 
             return (
             <div key={order.id} className="bg-white rounded-2xl shadow-md overflow-hidden border-2 border-blue-400 flex flex-col">
@@ -240,6 +252,13 @@ export default function DespachoPage() {
                     <span className="text-sm font-bold text-white/90 mt-1">👤 {customerInfo.name || order.table_number}</span>
                   )}
                   <span className="text-[10px] uppercase font-bold tracking-widest opacity-80 mt-2">LISTO PARA EMPAQUE</span>
+                  
+                  {/* 💡 ETIQUETA DE HORA PROMESA EN DESPACHO */}
+                  {targetTime && (
+                    <div className="mt-2 inline-block bg-yellow-400 text-yellow-900 text-xs font-black px-2 py-1 rounded shadow-sm">
+                      ⏱️ PROMESA: {targetTime}
+                    </div>
+                  )}
                 </div>
                 <div className="text-xs font-bold bg-black/20 px-2 py-1 rounded">{formatTime(order.created_at)}</div>
               </div>
@@ -260,10 +279,8 @@ export default function DespachoPage() {
                 ))}
               </div>
 
-              {/* GESTIÓN DE TARIFA Y TOTAL A COBRAR */}
               <div className="p-4 bg-white border-t border-gray-100 space-y-4">
                 
-                {/* 💡 NUEVO: VER DIRECCIÓN Y GPS ANTES DE COBRAR */}
                 {isDelivery && (
                   <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 text-sm shadow-sm">
                     {customerInfo.phone && (
@@ -285,7 +302,6 @@ export default function DespachoPage() {
                   </div>
                 )}
 
-                {/* SI ES DELIVERY Y AÚN NO TIENE TARIFA */}
                 {isDelivery && !hasFee && (
                   <div className="bg-purple-50 p-3 rounded-xl border-2 border-purple-200 flex gap-3 items-center shadow-inner">
                     <div className="flex-1">
@@ -306,7 +322,6 @@ export default function DespachoPage() {
                   </div>
                 )}
 
-                {/* SI TIENE TARIFA, MOSTRAR DESGLOSE */}
                 {isDelivery && hasFee && (
                   <div className="bg-purple-50 p-2.5 rounded-lg border border-purple-100">
                     <div className="flex justify-between text-xs font-bold text-gray-500 mb-1">
@@ -320,13 +335,11 @@ export default function DespachoPage() {
                   </div>
                 )}
 
-                {/* TOTAL FINAL SIEMPRE VISIBLE */}
                 <div className="flex justify-between items-center bg-gray-100 p-3 rounded-xl">
                     <span className="font-bold text-gray-500 uppercase tracking-widest text-xs">A Cobrar:</span>
                     <span className="font-black text-3xl text-gray-900">${order.total.toFixed(2)}</span>
                 </div>
 
-                {/* BOTONES DE COMUNICACIÓN DELIVERY */}
                 {isDelivery && hasFee && (
                   <div className="flex flex-col gap-2 border-b border-gray-100 pb-4">
                     <button onClick={() => notifyClient(order)} className="w-full bg-[#25D366] hover:bg-[#1DA851] text-white font-bold py-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-sm active:scale-95">
@@ -338,7 +351,6 @@ export default function DespachoPage() {
                   </div>
                 )}
 
-                {/* ACCIONES FINALES */}
                 <div className="flex gap-2">
                   <button onClick={() => printTicket(order)} className="w-14 bg-white border-2 border-gray-200 text-gray-600 font-bold py-2.5 rounded-xl hover:bg-gray-50 transition-all flex items-center justify-center text-lg active:scale-95">
                     🖨️

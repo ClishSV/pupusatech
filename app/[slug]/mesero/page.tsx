@@ -32,10 +32,12 @@ export default function WaiterPage() {
   const [countBebida, setCountBebida] = useState(1)
   
   const [searchTerm, setSearchTerm] = useState('')
+  
+  // 💡 NUEVO ESTADO: TIEMPO DE ESPERA (En minutos)
+  const [waitTime, setWaitTime] = useState<number>(0)
 
   const { cart, addToCart, removeFromCart, total, clearCart } = useCartStore()
 
-  // 💡 REGLA INTELIGENTE PARA PUPUSAS
   const isPupusaItem = (item: any) => {
     if (!item) return false;
     const catName = (item.category || '').toLowerCase();
@@ -44,7 +46,6 @@ export default function WaiterPage() {
     return pupusaKeywords.some(kw => catName.includes(kw) || itemName.includes(kw));
   }
 
-  // 💡 ORDENADOR DE CATEGORÍAS (La Báscula)
   const getCategoryWeight = (category: string) => {
     const lower = String(category).toLowerCase();
     if (lower.includes('tradicional')) return 1;
@@ -107,31 +108,36 @@ export default function WaiterPage() {
     setIsSubmitting(true)
     const tableName = selectedTable === 'LLEVAR' ? `🛍️ LLEVAR: ${takeoutName.trim()}` : `Mesa ${selectedTable}`
 
+    // 💡 GUARDAMOS EL TIEMPO EN CUSTOM_INFO
+    const customerInfo = waitTime > 0 ? { wait_time: waitTime } : {};
+
     const { data, error } = await supabase.from('orders').insert({
-      restaurant_id: restaurant.id, table_number: tableName, status: 'pending', total: total(), items: cart
+      restaurant_id: restaurant.id, 
+      table_number: tableName, 
+      status: 'pending', 
+      total: total(), 
+      items: cart,
+      customer_info: customerInfo
     }).select().single()
 
     setIsSubmitting(false)
     if (error) { alert("Error al enviar") } 
     else {
       setLastOrderTable(`${tableName} - #${data.id.slice(0,4).toUpperCase()}`); 
-      setShowSuccessToast(true); clearCart(); setShowCheckout(false); setSelectedTable(''); setTakeoutName('');
+      setShowSuccessToast(true); clearCart(); setShowCheckout(false); setSelectedTable(''); setTakeoutName(''); setWaitTime(0);
       setTimeout(() => setShowSuccessToast(false), 2500)
     }
   }
 
   const totalItemsModal = isPupusaItem(selectedItem) ? countMaiz + countArroz : countBebida
-
   const tableCount = restaurant?.table_count || 15;
   const dynamicTables = [...Array.from({ length: tableCount }, (_, i) => (i + 1).toString()), 'LLEVAR']
 
-  // LÓGICA DEL BUSCADOR
   const filteredMenu = menu.filter(item => 
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     item.category.toLowerCase().includes(searchTerm.toLowerCase())
   )
   
-  // Categorías ordenadas en el mesero
   const categoriesToRender = Array.from(new Set(filteredMenu.map(item => item.category)))
     .sort((a: any, b: any) => getCategoryWeight(a) - getCategoryWeight(b) || a.localeCompare(b));
 
@@ -175,7 +181,6 @@ export default function WaiterPage() {
             )}
         </div>
 
-        {/* BUSCADOR */}
         <div className="bg-gray-800 px-4 py-3">
           <div className="relative max-w-md mx-auto">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -216,12 +221,9 @@ export default function WaiterPage() {
               <div className="grid grid-cols-2 gap-3">
                 {items.map((item: any) => (
                   <div key={item.id} onClick={() => handleItemClick(item)} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-300 active:scale-95 transition-transform cursor-pointer relative flex flex-col justify-between min-h-[110px] hover:border-orange-500">
-                    
-                    {/* TEXTO GRANDE SIN FOTO (UX POS) */}
                     <div className="font-black text-gray-900 text-[15px] leading-snug mb-3">
                         {item.name}
                     </div>
-                    
                     <div className="flex justify-between items-center mt-auto">
                         <span className="text-sm text-gray-500 font-bold bg-gray-100 px-2 py-1 rounded-md border border-gray-200">${item.price.toFixed(2)}</span>
                         <div className="bg-orange-100 w-8 h-8 rounded-full flex items-center justify-center text-orange-600 font-black text-xl shadow-sm">+</div>
@@ -232,14 +234,8 @@ export default function WaiterPage() {
             </div>
           )
         })}
-        {filteredMenu.length === 0 && (
-          <div className="text-center py-10 text-gray-500 font-bold">
-            No se encontraron platillos. 🧐
-          </div>
-        )}
       </div>
 
-      {/* MODAL CANTIDAD (SIN FOTO PARA VELOCIDAD) */}
       {showModal && selectedItem && (
         <div className="fixed inset-0 bg-black/80 flex items-end justify-center z-50 animate-fade-in">
           <div className="bg-white w-full rounded-t-3xl p-6 shadow-2xl animate-slide-up">
@@ -283,11 +279,10 @@ export default function WaiterPage() {
         </div>
       )}
 
-      {/* CHECKOUT RÁPIDO */}
       {showCheckout && (
         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-sm shadow-2xl h-[90vh] flex flex-col animate-slide-up">
-            <div className="bg-gray-900 text-white p-5 flex justify-between items-center shadow-lg rounded-t-3xl sm:rounded-t-2xl">
+            <div className="bg-gray-900 text-white p-5 flex justify-between items-center shadow-lg rounded-t-3xl sm:rounded-t-2xl shrink-0">
                 <h2 className="text-2xl font-black flex flex-col leading-none">
                     <span>Confirmar Orden</span>
                     <span className="text-sm text-orange-400 font-mono mt-1">{selectedTable ? (selectedTable === 'LLEVAR' ? '🛍️ PARA LLEVAR' : `MESA ${selectedTable}`) : '⚠️ SIN MESA'}</span>
@@ -311,7 +306,7 @@ export default function WaiterPage() {
                 ))}
             </div>
 
-            <div className="p-5 border-t-2 border-gray-200 bg-white pb-8">
+            <div className="p-5 border-t-2 border-gray-200 bg-white pb-8 shrink-0">
                 
                 {selectedTable === 'LLEVAR' && (
                     <div className="mb-4 bg-orange-50 p-4 rounded-2xl border-2 border-orange-200">
@@ -319,12 +314,38 @@ export default function WaiterPage() {
                         <input 
                             type="text" 
                             placeholder="Ej: Don Carlos"
-                            className="w-full bg-white border-2 border-orange-300 rounded-xl p-4 outline-none focus:border-orange-500 font-black text-gray-800 text-lg shadow-inner"
+                            className="w-full bg-white border-2 border-orange-300 rounded-xl p-3 outline-none focus:border-orange-500 font-black text-gray-800 text-lg shadow-inner"
                             value={takeoutName}
                             onChange={(e) => setTakeoutName(e.target.value)}
                         />
                     </div>
                 )}
+
+                {/* 💡 SELECTOR DE TIEMPO DE ESPERA */}
+                <div className="mb-5 bg-gray-50 p-3 rounded-2xl border border-gray-200">
+                  <label className="block text-xs font-black text-gray-500 mb-2 uppercase tracking-wide">⏱️ Promesa de Entrega:</label>
+                  <div className="flex gap-2">
+                    {[
+                      { label: 'Normal', val: 0 },
+                      { label: '20m', val: 20 },
+                      { label: '30m', val: 30 },
+                      { label: '45m', val: 45 },
+                      { label: '1h', val: 60 }
+                    ].map(btn => (
+                      <button
+                        key={btn.val}
+                        onClick={() => setWaitTime(btn.val)}
+                        className={`flex-1 py-2 rounded-lg font-bold text-xs transition-all border ${
+                          waitTime === btn.val 
+                            ? 'bg-yellow-100 border-yellow-400 text-yellow-800 shadow-sm' 
+                            : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-100'
+                        }`}
+                      >
+                        {btn.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
                 <div className="flex justify-between text-3xl font-black mb-6 text-gray-900 bg-gray-100 p-4 rounded-2xl">
                     <span>Total:</span>
