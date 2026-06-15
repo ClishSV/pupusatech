@@ -18,7 +18,10 @@ export default function Dashboard() {
   const [historyModalRest, setHistoryModalRest] = useState<any>(null)
   const [historyOrders, setHistoryOrders] = useState<any[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
-  const [dateFilter, setDateFilter] = useState<'hoy' | 'ayer' | 'semana'>('hoy') // 💡 NUEVO FILTRO
+  
+  // 💡 NUEVOS ESTADOS DE FECHA Y HORA (TURNOS)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   
   const [showPinModal, setShowPinModal] = useState(false)
   const [pinInput, setPinInput] = useState('')
@@ -49,41 +52,41 @@ export default function Dashboard() {
     router.push('/')
   }
 
+  // PREPARAR FECHAS POR DEFECTO (EL DÍA DE HOY DESDE LAS 00:00 HASTA LAS 23:59)
+  const prepareDefaultDates = () => {
+    const now = new Date()
+    // Ajuste de zona horaria local para el input datetime-local
+    const offset = now.getTimezoneOffset() * 60000
+    const localNow = new Date(now.getTime() - offset)
+    
+    const todayStr = localNow.toISOString().slice(0,10) // YYYY-MM-DD
+    setDateFrom(`${todayStr}T00:00`)
+    setDateTo(`${todayStr}T23:59`)
+    
+    return { from: `${todayStr}T00:00`, to: `${todayStr}T23:59` }
+  }
+
   const verifyPinAndLoadHistory = (e: React.FormEvent) => {
     e.preventDefault()
     const correctPin = pendingRestForHistory?.admin_pin || '1234'
     if (pinInput === correctPin) {
       setShowPinModal(false); setPinInput('')
-      setDateFilter('hoy') // Por defecto abre en "hoy"
-      loadHistory(pendingRestForHistory, 'hoy') 
+      const defaultDates = prepareDefaultDates()
+      loadHistory(pendingRestForHistory, defaultDates.from, defaultDates.to) 
     } else {
       alert("Código incorrecto ❌"); setPinInput('')
     }
   }
 
-  // --- LÓGICA DE VENTAS (AHORA SOPORTA FECHAS) ---
-  const loadHistory = async (rest: any, filterType: 'hoy' | 'ayer' | 'semana') => {
+  // --- LÓGICA DE VENTAS (POR TURNO/RANGO EXACTO) ---
+  const loadHistory = async (rest: any, fromStr: string, toStr: string) => {
+    if(!fromStr || !toStr) return alert("Selecciona un rango de fecha y hora válido.")
+    
     setHistoryModalRest(rest)
     setLoadingHistory(true)
     
-    // Calcular rangos de fecha
-    const startDate = new Date()
-    const endDate = new Date()
-
-    if (filterType === 'hoy') {
-        startDate.setHours(0, 0, 0, 0)
-        endDate.setDate(endDate.getDate() + 1)
-        endDate.setHours(0, 0, 0, 0)
-    } else if (filterType === 'ayer') {
-        startDate.setDate(startDate.getDate() - 1)
-        startDate.setHours(0, 0, 0, 0)
-        endDate.setHours(0, 0, 0, 0)
-    } else if (filterType === 'semana') {
-        startDate.setDate(startDate.getDate() - 7)
-        startDate.setHours(0, 0, 0, 0)
-        endDate.setDate(endDate.getDate() + 1)
-        endDate.setHours(0, 0, 0, 0)
-    }
+    const startDate = new Date(fromStr)
+    const endDate = new Date(toStr)
 
     const { data } = await supabase
       .from('orders')
@@ -91,7 +94,7 @@ export default function Dashboard() {
       .eq('restaurant_id', rest.id)
       .in('status', ['delivered', 'cancelled'])
       .gte('created_at', startDate.toISOString())
-      .lt('created_at', endDate.toISOString())
+      .lte('created_at', endDate.toISOString())
       .order('created_at', { ascending: false })
 
     if (data) setHistoryOrders(data)
@@ -108,7 +111,7 @@ export default function Dashboard() {
     return Object.values(grouped)
   }
 
-  // --- 💡 CORTE DE CAJA A PRUEBA DE ERRORES ---
+  // --- 💡 CORTE DE CAJA A PRUEBA DE ERRORES (INCLUYE ENVÍOS) ---
   const calculateCorte = () => {
     const delivered = historyOrders.filter(o => o.status === 'delivered')
     const totalSales = delivered.reduce((sum, order) => sum + order.total, 0)
@@ -116,15 +119,18 @@ export default function Dashboard() {
     let totalPupusas = 0;
     let totalBebidas = 0;
     let totalOtros = 0;
+    let totalEnvios = 0;
 
     delivered.forEach(order => {
+      // Si la orden tiene tarifa de envío, sumamos
+      const fee = order.customer_info?.delivery_fee || 0;
+      totalEnvios += fee;
+
       order.items.forEach((item: any) => {
-        // LA REGLA INFALIBLE: Si tiene 'dough' (masa) ES una pupusa, 
-        // o si su categoría dice pupusa, tradicional, etc.
         const isPupusa = item.dough || (item.category && item.category.toLowerCase().includes('pupusa')) || (item.category && item.category.toLowerCase().includes('tradicional')) || (item.name && item.name.toLowerCase().includes('pupusa'));
         
         if (isPupusa) {
-          totalPupusas += item.price; // Como revisamos cart (flat), item.price es correcto
+          totalPupusas += item.price; 
         } else if (item.category?.toLowerCase().includes('bebida') || item.category?.toLowerCase().includes('soda') || item.category?.toLowerCase().includes('fresco')) {
           totalBebidas += item.price;
         } else {
@@ -133,15 +139,13 @@ export default function Dashboard() {
       })
     })
 
-    return { totalSales, totalOrders: delivered.length, totalPupusas, totalBebidas, totalOtros }
+    return { totalSales, totalOrders: delivered.length, totalPupusas, totalBebidas, totalOtros, totalEnvios }
   }
 
   const printCorteZ = () => {
     const stats = calculateCorte();
     const printWindow = window.open('', '', 'width=300,height=600')
     if (!printWindow) return
-
-    const periodStr = dateFilter === 'hoy' ? 'HOY' : dateFilter === 'ayer' ? 'AYER' : 'ÚLTIMOS 7 DÍAS';
 
     printWindow.document.write(`
       <html>
@@ -158,8 +162,9 @@ export default function Dashboard() {
           <div class="header">
             <div class="title">CORTE DE CAJA</div>
             <div>${historyModalRest.name}</div>
-            <div>Periodo: ${periodStr}</div>
-            <div>Impreso: ${new Date().toLocaleTimeString('es-SV')}</div>
+            <div style="font-size: 10px; margin-top: 5px;">Rango Seleccionado:</div>
+            <div style="font-size: 10px;">Del: ${new Date(dateFrom).toLocaleString('es-SV')}</div>
+            <div style="font-size: 10px;">Al: ${new Date(dateTo).toLocaleString('es-SV')}</div>
           </div>
           <br/>
           <div class="row"><span>Órdenes Entregadas:</span> <span>${stats.totalOrders}</span></div>
@@ -167,6 +172,7 @@ export default function Dashboard() {
           <div class="row"><span>Ventas Pupusas:</span> <span>$${stats.totalPupusas.toFixed(2)}</span></div>
           <div class="row"><span>Ventas Bebidas:</span> <span>$${stats.totalBebidas.toFixed(2)}</span></div>
           <div class="row"><span>Ventas Extras/Postres:</span> <span>$${stats.totalOtros.toFixed(2)}</span></div>
+          <div class="row" style="color: #666;"><span>Ingreso por Envíos:</span> <span>$${stats.totalEnvios.toFixed(2)}</span></div>
           <br/>
           <div class="row total"><span>TOTAL EN CAJA:</span> <span>$${stats.totalSales.toFixed(2)}</span></div>
           <br/><br/><div style="text-align:center">--- FIN DEL CORTE ---</div><br/><br/>.
@@ -176,8 +182,10 @@ export default function Dashboard() {
     printWindow.document.close(); printWindow.focus(); printWindow.print(); printWindow.close()
   }
 
-  const formatTime = (isoString: string) => {
-    return new Date(isoString).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })
+  // FORMATO COMPLETO: DÍA Y HORA
+  const formatFullTime = (isoString: string) => {
+    const d = new Date(isoString);
+    return `${d.toLocaleDateString('es-SV', { day: '2-digit', month: 'short', year: 'numeric' })} - ${d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })}`;
   }
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50 font-bold text-gray-500">Cargando tu imperio... 🏰</div>
@@ -262,22 +270,27 @@ export default function Dashboard() {
                     >
                       <span className="text-lg">📊</span> VENTAS Y CORTE Z
                     </button>
-                    
-                    <div className="grid grid-cols-2 gap-3">
-                      <Link href={`/${rest.slug}/admin`} className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white font-black py-3.5 rounded-xl shadow-md hover:shadow-orange-500/30 transition-all flex items-center justify-center gap-2 active:scale-95 text-sm">
-                        <span>👨‍🍳</span> Cocina
-                      </Link>
-                      <Link href={`/${rest.slug}/despacho`} className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-black py-3.5 rounded-xl shadow-md hover:shadow-blue-500/30 transition-all flex items-center justify-center gap-2 active:scale-95 text-sm">
-                        <span>🛍️</span> Caja
-                      </Link>
-                    </div>
+
+                    <Link 
+                      href={`/${rest.slug}/admin`}
+                      className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white font-black py-3.5 rounded-xl shadow-lg hover:shadow-orange-500/30 transition-all flex items-center justify-center gap-2 active:scale-95"
+                    >
+                      <span className="text-lg">👨‍🍳</span> IR A COCINA
+                    </Link>
+
+                    <Link 
+                      href={`/${rest.slug}/despacho`}
+                      className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-black py-3.5 rounded-xl shadow-lg hover:shadow-blue-500/30 transition-all flex items-center justify-center gap-2 active:scale-95"
+                    >
+                      <span className="text-lg">🛍️</span> CAJA Y DESPACHO
+                    </Link>
                     
                     <div className="grid grid-cols-2 gap-3">
                       <Link href={`/${rest.slug}/mesero`} className="bg-gray-900 text-white font-bold py-3 rounded-xl text-center hover:bg-black transition-colors shadow-md active:scale-95 flex items-center justify-center gap-2 text-sm">
                         <span className="text-lg">🤵</span> Mesero
                       </Link>
                       <Link href={`/${rest.slug}/admin/menu`} className="bg-white border-2 border-gray-200 text-gray-700 font-bold py-3 rounded-xl text-center hover:border-orange-400 hover:text-orange-600 transition-colors active:scale-95 flex items-center justify-center gap-2 text-sm shadow-sm">
-                        <span className="text-lg">📝</span> Menú
+                        <span className="text-lg">📝</span> Editar Menú
                       </Link>
                     </div>
                   </div>
@@ -320,16 +333,39 @@ export default function Dashboard() {
             <div className="bg-gray-900 p-6 text-white flex justify-between items-center shrink-0 border-b-4 border-blue-500">
               <div>
                 <h2 className="text-2xl font-black">Reporte de Ventas</h2>
-                <p className="text-gray-400 text-sm mt-1">{new Date().toLocaleDateString('es-SV', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                <p className="text-gray-400 text-xs mt-1 font-mono">Corte de Caja Personalizado</p>
               </div>
               <button onClick={() => setHistoryModalRest(null)} className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-gray-700 transition font-bold">✕</button>
             </div>
 
-            {/* 💡 NUEVO: SELECTOR DE FECHA */}
-            <div className="bg-white border-b border-gray-200 p-4 shrink-0 flex gap-2">
-              <button onClick={() => { setDateFilter('hoy'); loadHistory(historyModalRest, 'hoy'); }} className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all ${dateFilter === 'hoy' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>Hoy</button>
-              <button onClick={() => { setDateFilter('ayer'); loadHistory(historyModalRest, 'ayer'); }} className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all ${dateFilter === 'ayer' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>Ayer</button>
-              <button onClick={() => { setDateFilter('semana'); loadHistory(historyModalRest, 'semana'); }} className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all ${dateFilter === 'semana' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>7 Días</button>
+            {/* 💡 NUEVO: SELECTOR DE FECHAS (TURNOS) */}
+            <div className="bg-gray-100 border-b border-gray-200 p-4 shrink-0 shadow-inner flex flex-col gap-3">
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Desde:</label>
+                  <input 
+                    type="datetime-local" 
+                    value={dateFrom} 
+                    onChange={e => setDateFrom(e.target.value)} 
+                    className="w-full text-xs font-bold p-2.5 rounded-lg border border-gray-300 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-gray-700" 
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Hasta:</label>
+                  <input 
+                    type="datetime-local" 
+                    value={dateTo} 
+                    onChange={e => setDateTo(e.target.value)} 
+                    className="w-full text-xs font-bold p-2.5 rounded-lg border border-gray-300 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-gray-700" 
+                  />
+                </div>
+              </div>
+              <button 
+                onClick={() => loadHistory(historyModalRest, dateFrom, dateTo)} 
+                className="w-full bg-blue-600 text-white font-black py-2.5 rounded-lg text-sm shadow-md hover:bg-blue-700 transition-all active:scale-95"
+              >
+                Actualizar Corte 🔄
+              </button>
             </div>
 
             {loadingHistory ? (
@@ -343,7 +379,7 @@ export default function Dashboard() {
                   
                   <div className="grid grid-cols-2 gap-3 mb-5">
                     <div className="bg-green-50 border-2 border-green-200 p-4 rounded-2xl">
-                      <p className="text-green-800 font-bold text-xs mb-1 uppercase tracking-wide">Total Recibido</p>
+                      <p className="text-green-800 font-bold text-xs mb-1 uppercase tracking-wide">Efectivo Total</p>
                       <p className="text-3xl font-black text-green-700">${calculateCorte().totalSales.toFixed(2)}</p>
                     </div>
                     <div className="bg-blue-50 border-2 border-blue-200 p-4 rounded-2xl">
@@ -365,6 +401,10 @@ export default function Dashboard() {
                       <span>🍰 Ventas Extras:</span>
                       <span className="text-gray-900">${calculateCorte().totalOtros.toFixed(2)}</span>
                     </div>
+                    <div className="flex justify-between text-sm font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-md">
+                      <span>🛵 Cobro de Envíos:</span>
+                      <span className="text-purple-700">${calculateCorte().totalEnvios.toFixed(2)}</span>
+                    </div>
                   </div>
 
                   <button 
@@ -375,24 +415,27 @@ export default function Dashboard() {
                   </button>
                 </div>
 
-                {/* AUDITORÍA */}
+                {/* AUDITORÍA CON FECHA COMPLETA */}
                 <div>
                   <h3 className="font-black text-gray-800 uppercase tracking-widest text-xs mb-4">Auditoría de Pedidos</h3>
                   
                   {historyOrders.length === 0 ? (
                     <div className="text-center py-10 bg-white rounded-2xl border border-gray-200 text-gray-400 font-medium text-sm">
-                      Aún no hay pedidos en este periodo.
+                      Aún no hay pedidos en este rango de tiempo.
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {historyOrders.map(order => (
+                      {historyOrders.map(order => {
+                        const fee = order.customer_info?.delivery_fee;
+                        return (
                         <div key={order.id} className={`bg-white p-4 rounded-2xl shadow-sm border-l-4 ${order.status === 'delivered' ? 'border-green-500' : 'border-red-500'}`}>
                           <div className="flex justify-between items-start mb-3 border-b border-gray-100 pb-3">
                             <div>
                               <span className="font-black text-lg text-gray-900 leading-none">
                                 {order.table_number} <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-md ml-1 text-gray-500">#{order.id.slice(0,4).toUpperCase()}</span>
                               </span>
-                              <p className="text-[10px] text-gray-500 font-mono mt-1 font-bold">{formatTime(order.created_at)}</p>
+                              {/* 💡 LA FECHA AHORA ES CLARA */}
+                              <p className="text-[10px] text-gray-500 font-mono mt-1 font-bold">{formatFullTime(order.created_at)}</p>
                             </div>
                             <div className="text-right">
                               <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider ${
@@ -410,9 +453,15 @@ export default function Dashboard() {
                                 <span><strong className="text-gray-900">{item.quantity}x</strong> {item.name} {item.dough ? `(${item.dough})` : ''}</span>
                               </div>
                             ))}
+                            {fee > 0 && (
+                               <div className="flex justify-between text-xs text-purple-700 font-bold bg-purple-50 p-1.5 rounded">
+                                 <span>🛵 Tarifa de Envío</span>
+                                 <span>${fee.toFixed(2)}</span>
+                               </div>
+                            )}
                           </div>
                         </div>
-                      ))}
+                      )})}
                     </div>
                   )}
                 </div>

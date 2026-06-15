@@ -17,6 +17,9 @@ export default function DespachoPage() {
   const [audioEnabled, setAudioEnabled] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
+  // 💡 NUEVO ESTADO PARA CAPTURAR TARIFAS DE ENVÍO
+  const [deliveryFees, setDeliveryFees] = useState<Record<string, string>>({})
+
   const groupItems = (items: any[]) => {
     const grouped: Record<string, any> = {}
     items.forEach(item => {
@@ -45,6 +48,7 @@ export default function DespachoPage() {
   const printTicket = (order: any) => {
     const items = groupItems(order.items)
     const shortCode = order.id.slice(0,4).toUpperCase()
+    const fee = order.customer_info?.delivery_fee || 0
     const printWindow = window.open('', '', 'width=300,height=600')
     if (!printWindow) return
 
@@ -65,7 +69,7 @@ export default function DespachoPage() {
           <div class="header">
             <div class="title">${restaurant.name}</div>
             <div class="code">ORDEN #${shortCode}</div>
-            <div>Mesa: ${order.table_number}</div>
+            <div>Mesa/Cliente: ${order.table_number}</div>
             <div>${new Date(order.created_at).toLocaleTimeString()}</div>
           </div>
           ${items.map((item: any) => `
@@ -74,20 +78,68 @@ export default function DespachoPage() {
               <div>$${(item.price * item.quantity).toFixed(2)}</div>
             </div>
           `).join('')}
-          <div class="total">Total: $${order.total.toFixed(2)}</div>
-          <br/><br/>.
+          ${fee > 0 ? `
+            <div class="item" style="margin-top: 5px;">
+              <div>Tarifa de Envío</div>
+              <div>$${fee.toFixed(2)}</div>
+            </div>
+          ` : ''}
+          <div class="total">Total a Pagar: $${order.total.toFixed(2)}</div>
+          <br/><br/><br/><div style="text-align:center;">---</div>
         </body>
       </html>
     `)
     printWindow.document.close(); printWindow.focus(); printWindow.print(); printWindow.close()
   }
 
-  // --- WAZE / WHATSAPP ---
+  // --- 💡 LÓGICA DE TARIFAS Y WHATSAPP DOBLE ---
+  const saveDeliveryFee = async (order: any) => {
+    const feeStr = deliveryFees[order.id];
+    if (!feeStr || isNaN(Number(feeStr))) return alert('Ingresa una tarifa válida en números.');
+    
+    const fee = parseFloat(feeStr);
+    const newTotal = order.total + fee;
+    const newCustomerInfo = { ...order.customer_info, delivery_fee: fee };
+
+    // Actualización optimista
+    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, total: newTotal, customer_info: newCustomerInfo } : o));
+
+    // Guardar en Supabase
+    await supabase.from('orders').update({
+      total: newTotal,
+      customer_info: newCustomerInfo
+    }).eq('id', order.id);
+  }
+
+  const notifyClient = (order: any) => {
+    const info = order.customer_info || {};
+    const fee = info.delivery_fee || 0;
+    const subtotal = order.total - fee;
+    
+    const text = `¡Hola ${info.name || ''}! 👋\n\nTu pedido de *${restaurant.name}* ya está empacado y va en camino 🛵🔥.\n\n` +
+                 `🧾 *Desglose de tu Orden:*\n` +
+                 `• Comida: $${subtotal.toFixed(2)}\n` +
+                 `• Tarifa de Envío: $${fee.toFixed(2)}\n` +
+                 `*TOTAL A PAGAR: $${order.total.toFixed(2)}*\n\n` +
+                 `¡Gracias por preferirnos, buen provecho! 🫓`;
+    
+    // Si el cliente dio su número (Ej: 77778888), podemos intentar mandarlo directo
+    const phone = info.phone ? info.phone.replace(/\D/g, '') : '';
+    window.open(`https://wa.me/${phone ? '503'+phone : ''}?text=${encodeURIComponent(text)}`, '_blank');
+  }
+
   const sendToDriver = (order: any) => {
     const info = order.customer_info || {};
-    const shortCode = order.id.slice(0,4).toUpperCase()
+    const shortCode = order.id.slice(0,4).toUpperCase();
     const coordsStr = info.coords ? `${info.coords.lat},${info.coords.lng}` : '';
-    const text = `🛵 *NUEVO VIAJE - ORDEN #${shortCode}* 🛵\n\n👤 *Cliente:* ${info.name || order.table_number}\n📞 *Teléfono:* ${info.phone || 'No provisto'}\n💰 *Cobrar:* $${order.total.toFixed(2)} (Más tu envío)\n\n🏠 *Referencia:* ${info.address || 'No provista'}\n${coordsStr ? `📍 *Ubicación GPS:* https://waze.com/ul?ll=${coordsStr}&navigate=yes` : ''}`;
+    
+    const text = `🛵 *NUEVO VIAJE - ORDEN #${shortCode}* 🛵\n\n` +
+                 `👤 *Cliente:* ${info.name || order.table_number}\n` +
+                 `📞 *Teléfono:* ${info.phone || 'No provisto'}\n` +
+                 `💰 *TOTAL A COBRAR: $${order.total.toFixed(2)}*\n\n` +
+                 `🏠 *Referencia:* ${info.address || 'No provista'}\n` +
+                 (coordsStr ? `📍 *Ubicación GPS:* https://waze.com/ul?ll=${coordsStr}&navigate=yes` : '');
+    
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   }
 
@@ -177,6 +229,10 @@ export default function DespachoPage() {
             const isDelivery = order.order_type === 'delivery';
             const isTakeout = order.order_type === 'takeout';
             const customerInfo = order.customer_info || {};
+            
+            // Lógica para saber si ya se fijó la tarifa
+            const deliveryFee = customerInfo.delivery_fee;
+            const hasFee = deliveryFee !== undefined && deliveryFee !== null;
 
             return (
             <div key={order.id} className="bg-white rounded-2xl shadow-md overflow-hidden border-2 border-blue-400 flex flex-col">
@@ -212,26 +268,71 @@ export default function DespachoPage() {
                 ))}
               </div>
 
-              {/* TOTAL A COBRAR Y ACCIONES */}
-              <div className="p-4 bg-white border-t border-gray-100 space-y-3">
-                <div className="flex justify-between items-center bg-gray-100 p-3 rounded-xl mb-3">
-                    <span className="font-bold text-gray-500 uppercase tracking-widest text-xs">Cobrar:</span>
-                    <span className="font-black text-2xl text-gray-900">${order.total.toFixed(2)}</span>
-                </div>
-
-                {isDelivery && (
-                  <button onClick={() => sendToDriver(order)} className="w-full bg-[#25D366] hover:bg-[#1DA851] text-white font-bold py-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-sm active:scale-95">
-                    📲 Enviar WhatsApp a Motorista
-                  </button>
+              {/* GESTIÓN DE TARIFA Y TOTAL A COBRAR */}
+              <div className="p-4 bg-white border-t border-gray-100 space-y-4">
+                
+                {/* 💡 SI ES DELIVERY Y AÚN NO TIENE TARIFA */}
+                {isDelivery && !hasFee && (
+                  <div className="bg-purple-50 p-3 rounded-xl border-2 border-purple-200 flex gap-3 items-center shadow-inner">
+                    <div className="flex-1">
+                      <label className="text-[10px] font-black text-purple-800 uppercase tracking-wide block mb-1">Fijar Envío ($)</label>
+                      <input 
+                        type="number" step="0.25" placeholder="Ej: 2.50" 
+                        className="w-full p-2.5 rounded-lg font-black text-gray-900 outline-none border border-purple-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200" 
+                        value={deliveryFees[order.id] || ''} 
+                        onChange={e => setDeliveryFees({...deliveryFees, [order.id]: e.target.value})} 
+                      />
+                    </div>
+                    <button 
+                      onClick={() => saveDeliveryFee(order)} 
+                      className="bg-purple-600 text-white font-black py-2.5 px-4 rounded-lg mt-5 text-sm hover:bg-purple-700 shadow-md active:scale-95"
+                    >
+                      Guardar
+                    </button>
+                  </div>
                 )}
 
-                <button onClick={() => printTicket(order)} className="w-full bg-white border-2 border-gray-200 text-gray-600 font-bold py-2.5 rounded-xl hover:bg-gray-50 transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wide active:scale-95">
-                  🖨️ Imprimir Factura
-                </button>
-                
-                <button onClick={() => deliverOrder(order.id)} className="w-full bg-gray-900 hover:bg-black text-white font-black py-4 rounded-xl shadow-lg transition-all text-sm uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95">
-                  ✅ ENTREGAR Y COBRAR
-                </button>
+                {/* SI TIENE TARIFA, MOSTRAR DESGLOSE */}
+                {isDelivery && hasFee && (
+                  <div className="bg-purple-50 p-2.5 rounded-lg border border-purple-100">
+                    <div className="flex justify-between text-xs font-bold text-gray-500 mb-1">
+                      <span>Comida:</span>
+                      <span>${(order.total - deliveryFee).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-bold text-purple-700">
+                      <span>Tarifa de Envío:</span>
+                      <span>+ ${deliveryFee.toFixed(2)}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* TOTAL FINAL SIEMPRE VISIBLE */}
+                <div className="flex justify-between items-center bg-gray-100 p-3 rounded-xl">
+                    <span className="font-bold text-gray-500 uppercase tracking-widest text-xs">A Cobrar:</span>
+                    <span className="font-black text-3xl text-gray-900">${order.total.toFixed(2)}</span>
+                </div>
+
+                {/* BOTONES DE COMUNICACIÓN DELIVERY */}
+                {isDelivery && hasFee && (
+                  <div className="flex flex-col gap-2 border-b border-gray-100 pb-4">
+                    <button onClick={() => notifyClient(order)} className="w-full bg-[#25D366] hover:bg-[#1DA851] text-white font-bold py-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-sm active:scale-95">
+                      📲 Avisar a Cliente (Total)
+                    </button>
+                    <button onClick={() => sendToDriver(order)} className="w-full bg-gray-800 hover:bg-black text-white font-bold py-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-sm active:scale-95">
+                      🛵 WhatsApp a Motorista
+                    </button>
+                  </div>
+                )}
+
+                {/* ACCIONES FINALES */}
+                <div className="flex gap-2">
+                  <button onClick={() => printTicket(order)} className="w-14 bg-white border-2 border-gray-200 text-gray-600 font-bold py-2.5 rounded-xl hover:bg-gray-50 transition-all flex items-center justify-center text-lg active:scale-95">
+                    🖨️
+                  </button>
+                  <button onClick={() => deliverOrder(order.id)} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl shadow-lg transition-all text-sm uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95">
+                    ✅ ENTREGAR
+                  </button>
+                </div>
               </div>
             </div>
           )})}
