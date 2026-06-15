@@ -17,7 +17,6 @@ export default function DespachoPage() {
   const [audioEnabled, setAudioEnabled] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  // 💡 NUEVO ESTADO PARA CAPTURAR TARIFAS DE ENVÍO
   const [deliveryFees, setDeliveryFees] = useState<Record<string, string>>({})
 
   const groupItems = (items: any[]) => {
@@ -92,7 +91,7 @@ export default function DespachoPage() {
     printWindow.document.close(); printWindow.focus(); printWindow.print(); printWindow.close()
   }
 
-  // --- 💡 LÓGICA DE TARIFAS Y WHATSAPP DOBLE ---
+  // --- LÓGICA DE TARIFAS Y WHATSAPP DOBLE ---
   const saveDeliveryFee = async (order: any) => {
     const feeStr = deliveryFees[order.id];
     if (!feeStr || isNaN(Number(feeStr))) return alert('Ingresa una tarifa válida en números.');
@@ -101,10 +100,8 @@ export default function DespachoPage() {
     const newTotal = order.total + fee;
     const newCustomerInfo = { ...order.customer_info, delivery_fee: fee };
 
-    // Actualización optimista
     setOrders(prev => prev.map(o => o.id === order.id ? { ...o, total: newTotal, customer_info: newCustomerInfo } : o));
 
-    // Guardar en Supabase
     await supabase.from('orders').update({
       total: newTotal,
       customer_info: newCustomerInfo
@@ -123,7 +120,6 @@ export default function DespachoPage() {
                  `*TOTAL A PAGAR: $${order.total.toFixed(2)}*\n\n` +
                  `¡Gracias por preferirnos, buen provecho! 🫓`;
     
-    // Si el cliente dio su número (Ej: 77778888), podemos intentar mandarlo directo
     const phone = info.phone ? info.phone.replace(/\D/g, '') : '';
     window.open(`https://wa.me/${phone ? '503'+phone : ''}?text=${encodeURIComponent(text)}`, '_blank');
   }
@@ -153,7 +149,6 @@ export default function DespachoPage() {
       if (!restData) return
       setRestaurant(restData)
 
-      // EL DESPACHO SOLO VE LO QUE LA COCINA YA TERMINÓ
       const { data: ordersData } = await supabase.from('orders').select('*')
         .eq('restaurant_id', restData.id)
         .eq('status', 'ready')
@@ -161,7 +156,6 @@ export default function DespachoPage() {
 
       if (ordersData) setOrders(ordersData)
 
-      // Escuchamos actualizaciones (Cuando cocina pasa de cooking -> ready)
       const channel = supabase.channel('despacho-orders')
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restData.id}` },
           (payload) => {
@@ -170,7 +164,7 @@ export default function DespachoPage() {
                 if (!prev.find(o => o.id === payload.new.id)) return [...prev, payload.new]
                 return prev
               })
-              playNotificationSound() // Suena campana en despacho para que empaquen
+              playNotificationSound() 
             }
           }
         ).subscribe()
@@ -230,7 +224,6 @@ export default function DespachoPage() {
             const isTakeout = order.order_type === 'takeout';
             const customerInfo = order.customer_info || {};
             
-            // Lógica para saber si ya se fijó la tarifa
             const deliveryFee = customerInfo.delivery_fee;
             const hasFee = deliveryFee !== undefined && deliveryFee !== null;
 
@@ -251,7 +244,7 @@ export default function DespachoPage() {
                 <div className="text-xs font-bold bg-black/20 px-2 py-1 rounded">{formatTime(order.created_at)}</div>
               </div>
 
-              {/* LISTA DE ITEMS (En despacho SÍ importa ver el precio) */}
+              {/* LISTA DE ITEMS */}
               <div className="p-4 space-y-3 flex-1 overflow-y-auto max-h-80 bg-gray-50/50">
                 {groupItems(order.items).map((item: any, index: number) => (
                   <div key={index} className="flex justify-between items-center p-3 rounded-xl bg-white border border-gray-100 shadow-sm">
@@ -262,7 +255,6 @@ export default function DespachoPage() {
                         {item.dough && <span className="inline-block bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-0.5 rounded-md mt-1 uppercase">{item.dough}</span>}
                       </div>
                     </div>
-                    {/* EN DESPACHO SE VE EL PRECIO */}
                     <span className="font-bold text-gray-600 text-sm">${(item.price * item.quantity).toFixed(2)}</span>
                   </div>
                 ))}
@@ -271,7 +263,29 @@ export default function DespachoPage() {
               {/* GESTIÓN DE TARIFA Y TOTAL A COBRAR */}
               <div className="p-4 bg-white border-t border-gray-100 space-y-4">
                 
-                {/* 💡 SI ES DELIVERY Y AÚN NO TIENE TARIFA */}
+                {/* 💡 NUEVO: VER DIRECCIÓN Y GPS ANTES DE COBRAR */}
+                {isDelivery && (
+                  <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 text-sm shadow-sm">
+                    {customerInfo.phone && (
+                       <p className="font-bold text-gray-700 flex items-center gap-2 mb-2">
+                         <span>📞</span> <span>{customerInfo.phone}</span>
+                       </p>
+                    )}
+                    <p className="font-bold text-gray-700 flex items-start gap-2 leading-tight">
+                      <span>🏠</span> <span>{customerInfo.address || 'Sin dirección escrita'}</span>
+                    </p>
+                    {customerInfo.coords && (
+                      <button 
+                        onClick={() => window.open(`https://waze.com/ul?ll=${customerInfo.coords.lat},${customerInfo.coords.lng}&navigate=yes`, '_blank')}
+                        className="mt-3 w-full bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-2 text-xs shadow-sm active:scale-95"
+                      >
+                        📍 Abrir GPS para calcular tarifa
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* SI ES DELIVERY Y AÚN NO TIENE TARIFA */}
                 {isDelivery && !hasFee && (
                   <div className="bg-purple-50 p-3 rounded-xl border-2 border-purple-200 flex gap-3 items-center shadow-inner">
                     <div className="flex-1">
