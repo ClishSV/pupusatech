@@ -14,12 +14,12 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
   
-  // ESTADOS DEL CORTE Z Y SEGURIDAD
+  // ESTADOS DEL CORTE Z
   const [historyModalRest, setHistoryModalRest] = useState<any>(null)
   const [historyOrders, setHistoryOrders] = useState<any[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [dateFilter, setDateFilter] = useState<'hoy' | 'ayer' | 'semana'>('hoy') // 💡 NUEVO FILTRO
   
-  // 💡 NUEVOS ESTADOS PARA EL PIN DE SEGURIDAD
   const [showPinModal, setShowPinModal] = useState(false)
   const [pinInput, setPinInput] = useState('')
   const [pendingRestForHistory, setPendingRestForHistory] = useState<any>(null)
@@ -33,17 +33,10 @@ export default function Dashboard() {
   useEffect(() => {
     async function getData() {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
+      if (!user) { router.push('/login'); return }
       setUser(user)
 
-      const { data: myRestaurants } = await supabase
-        .from('restaurants')
-        .select('*')
-        .eq('owner_id', user.id) 
-      
+      const { data: myRestaurants } = await supabase.from('restaurants').select('*').eq('owner_id', user.id) 
       if (myRestaurants) setRestaurants(myRestaurants)
       setLoading(false)
     }
@@ -56,66 +49,66 @@ export default function Dashboard() {
     router.push('/')
   }
 
-  // --- 💡 LÓGICA DEL PIN DE SEGURIDAD ---
   const verifyPinAndLoadHistory = (e: React.FormEvent) => {
     e.preventDefault()
-    // Validamos el PIN ingresado contra el de la base de datos (por defecto '1234')
     const correctPin = pendingRestForHistory?.admin_pin || '1234'
-    
     if (pinInput === correctPin) {
-      setShowPinModal(false)
-      setPinInput('')
-      loadHistory(pendingRestForHistory) // Si es correcto, carga el dinero
+      setShowPinModal(false); setPinInput('')
+      setDateFilter('hoy') // Por defecto abre en "hoy"
+      loadHistory(pendingRestForHistory, 'hoy') 
     } else {
-      alert("Código incorrecto ❌")
-      setPinInput('')
+      alert("Código incorrecto ❌"); setPinInput('')
     }
   }
 
-  // --- LÓGICA DE VENTAS (CORTE Z) ---
-  const loadHistory = async (rest: any) => {
+  // --- LÓGICA DE VENTAS (AHORA SOPORTA FECHAS) ---
+  const loadHistory = async (rest: any, filterType: 'hoy' | 'ayer' | 'semana') => {
     setHistoryModalRest(rest)
     setLoadingHistory(true)
     
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
+    // Calcular rangos de fecha
+    const startDate = new Date()
+    const endDate = new Date()
+
+    if (filterType === 'hoy') {
+        startDate.setHours(0, 0, 0, 0)
+        endDate.setDate(endDate.getDate() + 1)
+        endDate.setHours(0, 0, 0, 0)
+    } else if (filterType === 'ayer') {
+        startDate.setDate(startDate.getDate() - 1)
+        startDate.setHours(0, 0, 0, 0)
+        endDate.setHours(0, 0, 0, 0)
+    } else if (filterType === 'semana') {
+        startDate.setDate(startDate.getDate() - 7)
+        startDate.setHours(0, 0, 0, 0)
+        endDate.setDate(endDate.getDate() + 1)
+        endDate.setHours(0, 0, 0, 0)
+    }
 
     const { data } = await supabase
       .from('orders')
       .select('*')
       .eq('restaurant_id', rest.id)
       .in('status', ['delivered', 'cancelled'])
-      .gte('created_at', today.toISOString())
-      .lt('created_at', tomorrow.toISOString())
+      .gte('created_at', startDate.toISOString())
+      .lt('created_at', endDate.toISOString())
       .order('created_at', { ascending: false })
 
     if (data) setHistoryOrders(data)
     setLoadingHistory(false)
   }
 
-  const isPupusaItem = (item: any) => {
-    if (!item) return false;
-    const catName = (item.category || '').toLowerCase();
-    const itemName = (item.name || '').toLowerCase();
-    const pupusaKeywords = ['pupusa', 'tradicional', 'especial', 'mixta', 'internacional', 'loca', 'birria'];
-    return pupusaKeywords.some(kw => catName.includes(kw) || itemName.includes(kw));
-  }
-
   const groupItems = (items: any[]) => {
     const grouped: Record<string, any> = {}
     items.forEach(item => {
       const key = `${item.id}-${item.dough || ''}`
-      if (grouped[key]) {
-        grouped[key].quantity += 1
-      } else {
-        grouped[key] = { ...item, quantity: 1 }
-      }
+      if (grouped[key]) { grouped[key].quantity += 1 } 
+      else { grouped[key] = { ...item, quantity: 1 } }
     })
     return Object.values(grouped)
   }
 
+  // --- 💡 CORTE DE CAJA A PRUEBA DE ERRORES ---
   const calculateCorte = () => {
     const delivered = historyOrders.filter(o => o.status === 'delivered')
     const totalSales = delivered.reduce((sum, order) => sum + order.total, 0)
@@ -126,9 +119,13 @@ export default function Dashboard() {
 
     delivered.forEach(order => {
       order.items.forEach((item: any) => {
-        if (isPupusaItem(item)) {
-          totalPupusas += item.price;
-        } else if (item.category?.toLowerCase().includes('bebida')) {
+        // LA REGLA INFALIBLE: Si tiene 'dough' (masa) ES una pupusa, 
+        // o si su categoría dice pupusa, tradicional, etc.
+        const isPupusa = item.dough || (item.category && item.category.toLowerCase().includes('pupusa')) || (item.category && item.category.toLowerCase().includes('tradicional')) || (item.name && item.name.toLowerCase().includes('pupusa'));
+        
+        if (isPupusa) {
+          totalPupusas += item.price; // Como revisamos cart (flat), item.price es correcto
+        } else if (item.category?.toLowerCase().includes('bebida') || item.category?.toLowerCase().includes('soda') || item.category?.toLowerCase().includes('fresco')) {
           totalBebidas += item.price;
         } else {
           totalOtros += item.price;
@@ -144,6 +141,8 @@ export default function Dashboard() {
     const printWindow = window.open('', '', 'width=300,height=600')
     if (!printWindow) return
 
+    const periodStr = dateFilter === 'hoy' ? 'HOY' : dateFilter === 'ayer' ? 'AYER' : 'ÚLTIMOS 7 DÍAS';
+
     printWindow.document.write(`
       <html>
         <head>
@@ -157,13 +156,13 @@ export default function Dashboard() {
         </head>
         <body>
           <div class="header">
-            <div class="title">CORTE Z (DIARIO)</div>
+            <div class="title">CORTE DE CAJA</div>
             <div>${historyModalRest.name}</div>
-            <div>Fecha: ${new Date().toLocaleDateString('es-SV')}</div>
-            <div>Hora: ${new Date().toLocaleTimeString('es-SV')}</div>
+            <div>Periodo: ${periodStr}</div>
+            <div>Impreso: ${new Date().toLocaleTimeString('es-SV')}</div>
           </div>
           <br/>
-          <div class="row"><span>Órdenes Completadas:</span> <span>${stats.totalOrders}</span></div>
+          <div class="row"><span>Órdenes Entregadas:</span> <span>${stats.totalOrders}</span></div>
           <br/>
           <div class="row"><span>Ventas Pupusas:</span> <span>$${stats.totalPupusas.toFixed(2)}</span></div>
           <div class="row"><span>Ventas Bebidas:</span> <span>$${stats.totalBebidas.toFixed(2)}</span></div>
@@ -254,37 +253,31 @@ export default function Dashboard() {
                   {/* BOTONES DE ADMINISTRACIÓN */}
                   <div className="mt-auto space-y-3">
                     
-                    {/* BOTÓN NUEVO: CORTE DE CAJA CON PIN */}
                     <button 
                       onClick={() => {
                         setPendingRestForHistory(rest)
-                        setShowPinModal(true) // 💡 Abre el candado en lugar de cargar directo
+                        setShowPinModal(true)
                       }}
                       className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 border-2 border-blue-200 font-black py-3.5 rounded-xl transition-colors flex items-center justify-center gap-2 active:scale-95"
                     >
                       <span className="text-lg">📊</span> VENTAS Y CORTE Z
                     </button>
-
-                    <Link 
-                      href={`/${rest.slug}/admin`}
-                      className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white font-black py-3.5 rounded-xl shadow-lg hover:shadow-orange-500/30 transition-all flex items-center justify-center gap-2 active:scale-95"
-                    >
-                      <span className="text-lg">👨‍🍳</span> IR A COCINA
-                    </Link>
-
-                    <Link 
-                      href={`/${rest.slug}/despacho`}
-                      className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-black py-3.5 rounded-xl shadow-lg hover:shadow-blue-500/30 transition-all flex items-center justify-center gap-2 active:scale-95"
-                    >
-                      <span className="text-lg">🛍️</span> CAJA Y DESPACHO
-                    </Link>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <Link href={`/${rest.slug}/admin`} className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white font-black py-3.5 rounded-xl shadow-md hover:shadow-orange-500/30 transition-all flex items-center justify-center gap-2 active:scale-95 text-sm">
+                        <span>👨‍🍳</span> Cocina
+                      </Link>
+                      <Link href={`/${rest.slug}/despacho`} className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-black py-3.5 rounded-xl shadow-md hover:shadow-blue-500/30 transition-all flex items-center justify-center gap-2 active:scale-95 text-sm">
+                        <span>🛍️</span> Caja
+                      </Link>
+                    </div>
                     
                     <div className="grid grid-cols-2 gap-3">
                       <Link href={`/${rest.slug}/mesero`} className="bg-gray-900 text-white font-bold py-3 rounded-xl text-center hover:bg-black transition-colors shadow-md active:scale-95 flex items-center justify-center gap-2 text-sm">
                         <span className="text-lg">🤵</span> Mesero
                       </Link>
                       <Link href={`/${rest.slug}/admin/menu`} className="bg-white border-2 border-gray-200 text-gray-700 font-bold py-3 rounded-xl text-center hover:border-orange-400 hover:text-orange-600 transition-colors active:scale-95 flex items-center justify-center gap-2 text-sm shadow-sm">
-                        <span className="text-lg">📝</span> Editar Menú
+                        <span className="text-lg">📝</span> Menú
                       </Link>
                     </div>
                   </div>
@@ -295,9 +288,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* ==========================================
-          MODAL 1: PIN DE SEGURIDAD 🔒
-          ========================================== */}
+      {/* MODAL 1: PIN DE SEGURIDAD */}
       {showPinModal && (
         <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white rounded-3xl w-full max-w-xs shadow-2xl p-6 text-center animate-scale-up border-2 border-gray-100">
@@ -307,43 +298,38 @@ export default function Dashboard() {
             
             <form onSubmit={verifyPinAndLoadHistory}>
               <input 
-                type="password" 
-                maxLength={4}
-                inputMode="numeric"
-                autoFocus
-                value={pinInput}
-                onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))} // Solo permite números
+                type="password" maxLength={4} inputMode="numeric" autoFocus value={pinInput}
+                onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))}
                 className="w-full text-center text-4xl tracking-[0.5em] font-black border-2 border-gray-200 rounded-2xl p-4 mb-4 focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition-all shadow-inner bg-gray-50"
                 placeholder="••••"
               />
-              <button 
-                type="submit" 
-                disabled={pinInput.length < 4} 
-                className="w-full bg-gray-900 text-white font-black py-4 rounded-xl hover:bg-black transition-all disabled:opacity-50 active:scale-95"
-              >
+              <button type="submit" disabled={pinInput.length < 4} className="w-full bg-gray-900 text-white font-black py-4 rounded-xl hover:bg-black transition-all disabled:opacity-50 active:scale-95">
                 Desbloquear
               </button>
             </form>
-            <button onClick={() => {setShowPinModal(false); setPinInput('');}} className="mt-4 text-sm text-gray-400 font-bold hover:text-gray-600">
-              Cancelar
-            </button>
+            <button onClick={() => {setShowPinModal(false); setPinInput('');}} className="mt-4 text-sm text-gray-400 font-bold hover:text-gray-600">Cancelar</button>
           </div>
         </div>
       )}
 
-      {/* ==========================================
-          MODAL 2: CORTE Z Y AUDITORÍA
-          ========================================== */}
+      {/* MODAL 2: CORTE Z Y AUDITORÍA */}
       {historyModalRest && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex justify-end">
           <div className="bg-white w-full max-w-md h-full shadow-2xl flex flex-col animate-slide-left">
             
             <div className="bg-gray-900 p-6 text-white flex justify-between items-center shrink-0 border-b-4 border-blue-500">
               <div>
-                <h2 className="text-2xl font-black">Corte del Día</h2>
+                <h2 className="text-2xl font-black">Reporte de Ventas</h2>
                 <p className="text-gray-400 text-sm mt-1">{new Date().toLocaleDateString('es-SV', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
               </div>
               <button onClick={() => setHistoryModalRest(null)} className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-gray-700 transition font-bold">✕</button>
+            </div>
+
+            {/* 💡 NUEVO: SELECTOR DE FECHA */}
+            <div className="bg-white border-b border-gray-200 p-4 shrink-0 flex gap-2">
+              <button onClick={() => { setDateFilter('hoy'); loadHistory(historyModalRest, 'hoy'); }} className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all ${dateFilter === 'hoy' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>Hoy</button>
+              <button onClick={() => { setDateFilter('ayer'); loadHistory(historyModalRest, 'ayer'); }} className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all ${dateFilter === 'ayer' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>Ayer</button>
+              <button onClick={() => { setDateFilter('semana'); loadHistory(historyModalRest, 'semana'); }} className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all ${dateFilter === 'semana' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>7 Días</button>
             </div>
 
             {loadingHistory ? (
@@ -357,11 +343,11 @@ export default function Dashboard() {
                   
                   <div className="grid grid-cols-2 gap-3 mb-5">
                     <div className="bg-green-50 border-2 border-green-200 p-4 rounded-2xl">
-                      <p className="text-green-800 font-bold text-xs mb-1 uppercase tracking-wide">Efectivo Total</p>
+                      <p className="text-green-800 font-bold text-xs mb-1 uppercase tracking-wide">Total Recibido</p>
                       <p className="text-3xl font-black text-green-700">${calculateCorte().totalSales.toFixed(2)}</p>
                     </div>
                     <div className="bg-blue-50 border-2 border-blue-200 p-4 rounded-2xl">
-                      <p className="text-blue-800 font-bold text-xs mb-1 uppercase tracking-wide">Órdenes Hoy</p>
+                      <p className="text-blue-800 font-bold text-xs mb-1 uppercase tracking-wide">Órdenes</p>
                       <p className="text-3xl font-black text-blue-700">{calculateCorte().totalOrders}</p>
                     </div>
                   </div>
@@ -389,13 +375,13 @@ export default function Dashboard() {
                   </button>
                 </div>
 
-                {/* AUDITORÍA (RECLAMOS) */}
+                {/* AUDITORÍA */}
                 <div>
-                  <h3 className="font-black text-gray-800 uppercase tracking-widest text-xs mb-4">Auditoría de Pedidos (Hoy)</h3>
+                  <h3 className="font-black text-gray-800 uppercase tracking-widest text-xs mb-4">Auditoría de Pedidos</h3>
                   
                   {historyOrders.length === 0 ? (
                     <div className="text-center py-10 bg-white rounded-2xl border border-gray-200 text-gray-400 font-medium text-sm">
-                      Aún no hay pedidos terminados hoy.
+                      Aún no hay pedidos en este periodo.
                     </div>
                   ) : (
                     <div className="space-y-4">
@@ -403,7 +389,9 @@ export default function Dashboard() {
                         <div key={order.id} className={`bg-white p-4 rounded-2xl shadow-sm border-l-4 ${order.status === 'delivered' ? 'border-green-500' : 'border-red-500'}`}>
                           <div className="flex justify-between items-start mb-3 border-b border-gray-100 pb-3">
                             <div>
-                              <span className="font-black text-lg text-gray-900 leading-none">{order.table_number}</span>
+                              <span className="font-black text-lg text-gray-900 leading-none">
+                                {order.table_number} <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-md ml-1 text-gray-500">#{order.id.slice(0,4).toUpperCase()}</span>
+                              </span>
                               <p className="text-[10px] text-gray-500 font-mono mt-1 font-bold">{formatTime(order.created_at)}</p>
                             </div>
                             <div className="text-right">
@@ -438,10 +426,6 @@ export default function Dashboard() {
       <style jsx global>{`
         @keyframes slide-left { from { transform: translateX(100%); } to { transform: translateX(0); } }
         .animate-slide-left { animation: slide-left 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-        .animate-fade-in { animation: fade-in 0.2s ease-out; }
-        @keyframes scale-up { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
-        .animate-scale-up { animation: scale-up 0.2s ease-out; }
       `}</style>
     </div>
   )

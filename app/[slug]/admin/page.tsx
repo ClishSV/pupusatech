@@ -128,8 +128,9 @@ export default function KitchenPage() {
             <div key={order.id} className={`bg-white rounded-2xl shadow-md overflow-hidden border-2 transition-all flex flex-col ${order.status === 'pending' ? 'border-gray-800' : 'border-green-500'}`}>
               <div className={`p-4 text-white flex justify-between items-start ${order.status === 'pending' ? 'bg-gray-900' : 'bg-green-600'}`}>
                 <div className="flex flex-col">
-                  <span className="font-black text-xl tracking-tight leading-tight">
+                  <span className="font-black text-xl tracking-tight leading-tight flex items-center gap-2">
                     {isDelivery ? `🛵 Domicilio` : isTakeout ? `🛍️ Llevar` : order.table_number}
+                    <span className="bg-white/20 px-2 py-0.5 rounded text-sm">#{order.id.slice(0,4).toUpperCase()}</span>
                   </span>
                   <span className="text-[10px] uppercase font-bold tracking-widest opacity-80 mt-2">
                     {order.status === 'pending' ? '⏳ POR CONFIRMAR' : '🔥 EN PLANCHA'}

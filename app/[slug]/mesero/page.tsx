@@ -107,14 +107,15 @@ export default function WaiterPage() {
     setIsSubmitting(true)
     const tableName = selectedTable === 'LLEVAR' ? `🛍️ LLEVAR: ${takeoutName.trim()}` : `Mesa ${selectedTable}`
 
-    const { error } = await supabase.from('orders').insert({
+    const { data, error } = await supabase.from('orders').insert({
       restaurant_id: restaurant.id, table_number: tableName, status: 'pending', total: total(), items: cart
-    })
+    }).select().single()
 
     setIsSubmitting(false)
     if (error) { alert("Error al enviar") } 
     else {
-      setLastOrderTable(tableName); setShowSuccessToast(true); clearCart(); setShowCheckout(false); setSelectedTable(''); setTakeoutName('');
+      setLastOrderTable(`${tableName} - #${data.id.slice(0,4).toUpperCase()}`); 
+      setShowSuccessToast(true); clearCart(); setShowCheckout(false); setSelectedTable(''); setTakeoutName('');
       setTimeout(() => setShowSuccessToast(false), 2500)
     }
   }

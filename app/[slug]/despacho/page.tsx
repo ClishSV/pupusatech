@@ -44,6 +44,7 @@ export default function DespachoPage() {
   // --- IMPRESIÓN ---
   const printTicket = (order: any) => {
     const items = groupItems(order.items)
+    const shortCode = order.id.slice(0,4).toUpperCase()
     const printWindow = window.open('', '', 'width=300,height=600')
     if (!printWindow) return
 
@@ -54,6 +55,7 @@ export default function DespachoPage() {
             body { font-family: 'Courier New', monospace; width: 58mm; font-size: 12px; margin: 0; padding: 5px; }
             .header { text-align: center; margin-bottom: 10px; border-bottom: 1px dashed black; padding-bottom: 5px; }
             .title { font-size: 16px; font-weight: bold; }
+            .code { font-size: 20px; font-weight: black; margin: 5px 0; }
             .item { display: flex; justify-content: space-between; margin-bottom: 5px; }
             .qty { font-weight: bold; margin-right: 5px; }
             .total { border-top: 1px dashed black; margin-top: 10px; padding-top: 5px; text-align: right; font-size: 14px; font-weight: bold; }
@@ -62,6 +64,7 @@ export default function DespachoPage() {
         <body>
           <div class="header">
             <div class="title">${restaurant.name}</div>
+            <div class="code">ORDEN #${shortCode}</div>
             <div>Mesa: ${order.table_number}</div>
             <div>${new Date(order.created_at).toLocaleTimeString()}</div>
           </div>
@@ -82,8 +85,9 @@ export default function DespachoPage() {
   // --- WAZE / WHATSAPP ---
   const sendToDriver = (order: any) => {
     const info = order.customer_info || {};
+    const shortCode = order.id.slice(0,4).toUpperCase()
     const coordsStr = info.coords ? `${info.coords.lat},${info.coords.lng}` : '';
-    const text = `🛵 *NUEVO VIAJE - PUPUSATECH* 🛵\n\n👤 *Cliente:* ${info.name || order.table_number}\n📞 *Teléfono:* ${info.phone || 'No provisto'}\n💰 *Cobrar:* $${order.total.toFixed(2)} (Más tu envío)\n\n🏠 *Referencia:* ${info.address || 'No provista'}\n${coordsStr ? `📍 *Ubicación GPS:* https://waze.com/ul?ll=${coordsStr}&navigate=yes` : ''}`;
+    const text = `🛵 *NUEVO VIAJE - ORDEN #${shortCode}* 🛵\n\n👤 *Cliente:* ${info.name || order.table_number}\n📞 *Teléfono:* ${info.phone || 'No provisto'}\n💰 *Cobrar:* $${order.total.toFixed(2)} (Más tu envío)\n\n🏠 *Referencia:* ${info.address || 'No provista'}\n${coordsStr ? `📍 *Ubicación GPS:* https://waze.com/ul?ll=${coordsStr}&navigate=yes` : ''}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   }
 
@@ -179,8 +183,9 @@ export default function DespachoPage() {
               
               <div className="bg-blue-600 p-4 text-white flex justify-between items-start">
                 <div className="flex flex-col">
-                  <span className="font-black text-xl tracking-tight leading-tight">
+                  <span className="font-black text-xl tracking-tight leading-tight flex items-center gap-2">
                     {isDelivery ? `🛵 Domicilio` : isTakeout ? `🛍️ Llevar` : order.table_number}
+                    <span className="bg-white/20 px-2 py-0.5 rounded text-sm">#{order.id.slice(0,4).toUpperCase()}</span>
                   </span>
                   {(isDelivery || isTakeout) && (
                     <span className="text-sm font-bold text-white/90 mt-1">👤 {customerInfo.name || order.table_number}</span>

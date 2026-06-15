@@ -257,7 +257,12 @@ export default function MenuPage() {
              <div className="mt-4"><div className="text-5xl mb-4">👋</div><h3 className="text-xl font-bold text-gray-800 mb-2">Orden Finalizada</h3><p className="text-gray-500 mb-6 text-sm">Gracias por tu preferencia.</p><button onClick={() => { setActiveOrderId(null); localStorage.removeItem('activeOrderId') }} className="bg-gray-900 text-white font-bold py-3 px-6 rounded-xl w-full hover:bg-black transition shadow-lg">Hacer nuevo pedido</button></div>
           )}
         </div>
-        {orderStatus !== 'delivered' && orderStatus !== 'cancelled' && (<p className="relative z-10 mt-8 text-xs text-gray-400">ID Pedido: <span className="font-mono bg-white/50 px-2 py-1 rounded">{activeOrderId?.slice(0,8)}</span></p>)}
+       {orderStatus !== 'delivered' && orderStatus !== 'cancelled' && (
+           <div className="relative z-10 mt-8 bg-white/80 backdrop-blur-sm border border-gray-200 px-6 py-3 rounded-2xl shadow-lg">
+             <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-1">Tu Código de Retiro:</p>
+             <p className="font-black text-4xl text-orange-600 tracking-widest">#{activeOrderId?.slice(0,4).toUpperCase()}</p>
+           </div>
+        )}
         <style jsx>{` @keyframes progress-indeterminate { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } } .animate-progress-indeterminate { animation: progress-indeterminate 1.5s infinite linear; } `}</style>
       </div>
     )
