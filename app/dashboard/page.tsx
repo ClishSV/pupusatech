@@ -19,9 +19,11 @@ export default function Dashboard() {
   const [historyOrders, setHistoryOrders] = useState<any[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
   
-  // 💡 NUEVOS ESTADOS DE FECHA Y HORA (TURNOS)
+  // TURNOS Y VISTAS SEPARADAS
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [targetView, setTargetView] = useState<'corte' | 'history' | null>(null) // 💡 NUEVO ESTADO PARA SEPARAR VISTAS
+  const [pinAction, setPinAction] = useState<'corte' | 'history'>('corte')
   
   const [showPinModal, setShowPinModal] = useState(false)
   const [pinInput, setPinInput] = useState('')
@@ -52,17 +54,13 @@ export default function Dashboard() {
     router.push('/')
   }
 
-  // PREPARAR FECHAS POR DEFECTO (EL DÍA DE HOY DESDE LAS 00:00 HASTA LAS 23:59)
   const prepareDefaultDates = () => {
     const now = new Date()
-    // Ajuste de zona horaria local para el input datetime-local
     const offset = now.getTimezoneOffset() * 60000
     const localNow = new Date(now.getTime() - offset)
-    
-    const todayStr = localNow.toISOString().slice(0,10) // YYYY-MM-DD
+    const todayStr = localNow.toISOString().slice(0,10) 
     setDateFrom(`${todayStr}T00:00`)
     setDateTo(`${todayStr}T23:59`)
-    
     return { from: `${todayStr}T00:00`, to: `${todayStr}T23:59` }
   }
 
@@ -70,7 +68,8 @@ export default function Dashboard() {
     e.preventDefault()
     const correctPin = pendingRestForHistory?.admin_pin || '1234'
     if (pinInput === correctPin) {
-      setShowPinModal(false); setPinInput('')
+      setShowPinModal(false); setPinInput('');
+      setTargetView(pinAction); // Definimos qué ventana abrir
       const defaultDates = prepareDefaultDates()
       loadHistory(pendingRestForHistory, defaultDates.from, defaultDates.to) 
     } else {
@@ -78,7 +77,6 @@ export default function Dashboard() {
     }
   }
 
-  // --- LÓGICA DE VENTAS (POR TURNO/RANGO EXACTO) ---
   const loadHistory = async (rest: any, fromStr: string, toStr: string) => {
     if(!fromStr || !toStr) return alert("Selecciona un rango de fecha y hora válido.")
     
@@ -111,7 +109,6 @@ export default function Dashboard() {
     return Object.values(grouped)
   }
 
-  // --- 💡 CORTE DE CAJA A PRUEBA DE ERRORES (INCLUYE ENVÍOS) ---
   const calculateCorte = () => {
     const delivered = historyOrders.filter(o => o.status === 'delivered')
     const totalSales = delivered.reduce((sum, order) => sum + order.total, 0)
@@ -122,20 +119,14 @@ export default function Dashboard() {
     let totalEnvios = 0;
 
     delivered.forEach(order => {
-      // Si la orden tiene tarifa de envío, sumamos
       const fee = order.customer_info?.delivery_fee || 0;
       totalEnvios += fee;
 
       order.items.forEach((item: any) => {
         const isPupusa = item.dough || (item.category && item.category.toLowerCase().includes('pupusa')) || (item.category && item.category.toLowerCase().includes('tradicional')) || (item.name && item.name.toLowerCase().includes('pupusa'));
-        
-        if (isPupusa) {
-          totalPupusas += item.price; 
-        } else if (item.category?.toLowerCase().includes('bebida') || item.category?.toLowerCase().includes('soda') || item.category?.toLowerCase().includes('fresco')) {
-          totalBebidas += item.price;
-        } else {
-          totalOtros += item.price;
-        }
+        if (isPupusa) totalPupusas += item.price; 
+        else if (item.category?.toLowerCase().includes('bebida') || item.category?.toLowerCase().includes('soda') || item.category?.toLowerCase().includes('fresco')) totalBebidas += item.price;
+        else totalOtros += item.price;
       })
     })
 
@@ -162,8 +153,7 @@ export default function Dashboard() {
           <div class="header">
             <div class="title">CORTE DE CAJA</div>
             <div>${historyModalRest.name}</div>
-            <div style="font-size: 10px; margin-top: 5px;">Rango Seleccionado:</div>
-            <div style="font-size: 10px;">Del: ${new Date(dateFrom).toLocaleString('es-SV')}</div>
+            <div style="font-size: 10px; margin-top: 5px;">Del: ${new Date(dateFrom).toLocaleString('es-SV')}</div>
             <div style="font-size: 10px;">Al: ${new Date(dateTo).toLocaleString('es-SV')}</div>
           </div>
           <br/>
@@ -182,7 +172,6 @@ export default function Dashboard() {
     printWindow.document.close(); printWindow.focus(); printWindow.print(); printWindow.close()
   }
 
-  // FORMATO COMPLETO: DÍA Y HORA
   const formatFullTime = (isoString: string) => {
     const d = new Date(isoString);
     return `${d.toLocaleDateString('es-SV', { day: '2-digit', month: 'short', year: 'numeric' })} - ${d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })}`;
@@ -193,7 +182,6 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-800">
       
-      {/* NAVBAR DASHBOARD */}
       <nav className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center sticky top-0 z-20 shadow-sm">
         <div className="flex items-center gap-3">
           <img src="/logo-icon.png" alt="Logo" className="h-10 w-auto" />
@@ -208,7 +196,6 @@ export default function Dashboard() {
         </div>
       </nav>
 
-      {/* CONTENIDO PRINCIPAL */}
       <div className="max-w-6xl mx-auto px-4 py-12">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-10 gap-4">
           <div>
@@ -238,14 +225,9 @@ export default function Dashboard() {
               return (
                 <div key={rest.id} className="bg-white rounded-3xl p-6 shadow-md border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group flex flex-col">
                   
-                  {/* CABECERA TARJETA */}
                   <div className="flex items-center gap-4 mb-6">
                     <div className="w-16 h-16 bg-gradient-to-br from-orange-100 to-red-100 rounded-2xl flex items-center justify-center text-3xl border-2 border-white shadow-sm overflow-hidden shrink-0 group-hover:scale-105 transition-transform">
-                      {hasPhotoUrl ? (
-                         <img src={rest.logo_url} alt={rest.name} className="w-full h-full object-cover" />
-                      ) : (
-                         <span className="font-black text-orange-500">{rest.logo_url || firstLetter}</span>
-                      )}
+                      {hasPhotoUrl ? <img src={rest.logo_url} alt={rest.name} className="w-full h-full object-cover" /> : <span className="font-black text-orange-500">{rest.logo_url || firstLetter}</span>}
                     </div>
                     <div>
                       <h3 className="font-black text-xl text-gray-900 leading-tight line-clamp-2">{rest.name}</h3>
@@ -258,39 +240,33 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* BOTONES DE ADMINISTRACIÓN */}
                   <div className="mt-auto space-y-3">
                     
-                    <button 
-                      onClick={() => {
-                        setPendingRestForHistory(rest)
-                        setShowPinModal(true)
-                      }}
-                      className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 border-2 border-blue-200 font-black py-3.5 rounded-xl transition-colors flex items-center justify-center gap-2 active:scale-95"
-                    >
-                      <span className="text-lg">📊</span> VENTAS Y CORTE Z
-                    </button>
+                    {/* 💡 AQUÍ ESTÁN LOS DOS BOTONES SEPARADOS */}
+                    <div className="grid grid-cols-2 gap-3 mb-2">
+                      <button onClick={() => { setPinAction('corte'); setPendingRestForHistory(rest); setShowPinModal(true); }} className="w-full bg-green-50 hover:bg-green-100 text-green-700 border-2 border-green-200 font-black py-3 rounded-xl transition-colors flex items-center justify-center gap-2 active:scale-95 text-xs uppercase tracking-widest">
+                        💰 CORTE Z
+                      </button>
+                      <button onClick={() => { setPinAction('history'); setPendingRestForHistory(rest); setShowPinModal(true); }} className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 border-2 border-blue-200 font-black py-3 rounded-xl transition-colors flex items-center justify-center gap-2 active:scale-95 text-xs uppercase tracking-widest">
+                        📜 HISTORIAL
+                      </button>
+                    </div>
 
-                    <Link 
-                      href={`/${rest.slug}/admin`}
-                      className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white font-black py-3.5 rounded-xl shadow-lg hover:shadow-orange-500/30 transition-all flex items-center justify-center gap-2 active:scale-95"
-                    >
-                      <span className="text-lg">👨‍🍳</span> IR A COCINA
-                    </Link>
-
-                    <Link 
-                      href={`/${rest.slug}/despacho`}
-                      className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-black py-3.5 rounded-xl shadow-lg hover:shadow-blue-500/30 transition-all flex items-center justify-center gap-2 active:scale-95"
-                    >
-                      <span className="text-lg">🛍️</span> CAJA Y DESPACHO
-                    </Link>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Link href={`/${rest.slug}/admin`} className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white font-black py-3.5 rounded-xl shadow-md hover:shadow-orange-500/30 transition-all flex items-center justify-center gap-2 active:scale-95 text-sm">
+                        <span>👨‍🍳</span> Cocina
+                      </Link>
+                      <Link href={`/${rest.slug}/despacho`} className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-black py-3.5 rounded-xl shadow-md hover:shadow-blue-500/30 transition-all flex items-center justify-center gap-2 active:scale-95 text-sm">
+                        <span>🛍️</span> Caja
+                      </Link>
+                    </div>
                     
                     <div className="grid grid-cols-2 gap-3">
                       <Link href={`/${rest.slug}/mesero`} className="bg-gray-900 text-white font-bold py-3 rounded-xl text-center hover:bg-black transition-colors shadow-md active:scale-95 flex items-center justify-center gap-2 text-sm">
                         <span className="text-lg">🤵</span> Mesero
                       </Link>
                       <Link href={`/${rest.slug}/admin/menu`} className="bg-white border-2 border-gray-200 text-gray-700 font-bold py-3 rounded-xl text-center hover:border-orange-400 hover:text-orange-600 transition-colors active:scale-95 flex items-center justify-center gap-2 text-sm shadow-sm">
-                        <span className="text-lg">📝</span> Editar Menú
+                        <span className="text-lg">📝</span> Menú
                       </Link>
                     </div>
                   </div>
@@ -301,13 +277,12 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* MODAL 1: PIN DE SEGURIDAD */}
       {showPinModal && (
         <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white rounded-3xl w-full max-w-xs shadow-2xl p-6 text-center animate-scale-up border-2 border-gray-100">
             <div className="text-5xl mb-4">🔒</div>
             <h3 className="text-2xl font-black text-gray-900 mb-2">Seguridad</h3>
-            <p className="text-sm text-gray-500 mb-6">Ingresa el PIN de dueño para ver el dinero en caja.</p>
+            <p className="text-sm text-gray-500 mb-6">Ingresa el PIN de dueño para ver esta sección.</p>
             
             <form onSubmit={verifyPinAndLoadHistory}>
               <input 
@@ -325,146 +300,108 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* MODAL 2: CORTE Z Y AUDITORÍA */}
       {historyModalRest && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex justify-end">
           <div className="bg-white w-full max-w-md h-full shadow-2xl flex flex-col animate-slide-left">
             
-            <div className="bg-gray-900 p-6 text-white flex justify-between items-center shrink-0 border-b-4 border-blue-500">
+            <div className={`p-6 text-white flex justify-between items-center shrink-0 border-b-4 ${targetView === 'corte' ? 'bg-green-600 border-green-800' : 'bg-blue-600 border-blue-800'}`}>
               <div>
-                <h2 className="text-2xl font-black">Reporte de Ventas</h2>
-                <p className="text-gray-400 text-xs mt-1 font-mono">Corte de Caja Personalizado</p>
+                <h2 className="text-2xl font-black">{targetView === 'corte' ? 'Corte Z' : 'Historial de Pedidos'}</h2>
+                <p className="text-white/80 text-xs mt-1 font-mono">{historyModalRest.name}</p>
               </div>
-              <button onClick={() => setHistoryModalRest(null)} className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-gray-700 transition font-bold">✕</button>
+              <button onClick={() => setHistoryModalRest(null)} className="w-10 h-10 bg-black/20 rounded-full flex items-center justify-center hover:bg-black/40 transition font-bold">✕</button>
             </div>
 
-            {/* 💡 NUEVO: SELECTOR DE FECHAS (TURNOS) */}
             <div className="bg-gray-100 border-b border-gray-200 p-4 shrink-0 shadow-inner flex flex-col gap-3">
               <div className="flex gap-3">
                 <div className="flex-1">
                   <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Desde:</label>
-                  <input 
-                    type="datetime-local" 
-                    value={dateFrom} 
-                    onChange={e => setDateFrom(e.target.value)} 
-                    className="w-full text-xs font-bold p-2.5 rounded-lg border border-gray-300 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-gray-700" 
-                  />
+                  <input type="datetime-local" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-full text-xs font-bold p-2.5 rounded-lg border border-gray-300 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-gray-700" />
                 </div>
                 <div className="flex-1">
                   <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Hasta:</label>
-                  <input 
-                    type="datetime-local" 
-                    value={dateTo} 
-                    onChange={e => setDateTo(e.target.value)} 
-                    className="w-full text-xs font-bold p-2.5 rounded-lg border border-gray-300 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-gray-700" 
-                  />
+                  <input type="datetime-local" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-full text-xs font-bold p-2.5 rounded-lg border border-gray-300 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-gray-700" />
                 </div>
               </div>
-              <button 
-                onClick={() => loadHistory(historyModalRest, dateFrom, dateTo)} 
-                className="w-full bg-blue-600 text-white font-black py-2.5 rounded-lg text-sm shadow-md hover:bg-blue-700 transition-all active:scale-95"
-              >
-                Actualizar Corte 🔄
+              <button onClick={() => loadHistory(historyModalRest, dateFrom, dateTo)} className={`w-full text-white font-black py-2.5 rounded-lg text-sm shadow-md transition-all active:scale-95 ${targetView === 'corte' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                Actualizar Vista 🔄
               </button>
             </div>
 
             {loadingHistory ? (
-              <div className="flex-1 flex items-center justify-center text-gray-500 font-bold animate-pulse">Calculando ventas...</div>
+              <div className="flex-1 flex items-center justify-center text-gray-500 font-bold animate-pulse">Cargando datos...</div>
             ) : (
               <div className="flex-1 overflow-y-auto p-5 bg-gray-50 space-y-6">
                 
-                {/* RESUMEN FINANCIERO */}
-                <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-200">
-                  <h3 className="font-black text-gray-800 uppercase tracking-widest text-xs mb-4">Resumen de Caja</h3>
-                  
-                  <div className="grid grid-cols-2 gap-3 mb-5">
-                    <div className="bg-green-50 border-2 border-green-200 p-4 rounded-2xl">
-                      <p className="text-green-800 font-bold text-xs mb-1 uppercase tracking-wide">Efectivo Total</p>
-                      <p className="text-3xl font-black text-green-700">${calculateCorte().totalSales.toFixed(2)}</p>
+                {/* VISTA 1: SOLO CORTE Z */}
+                {targetView === 'corte' && (
+                  <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-200 animate-fade-in">
+                    <h3 className="font-black text-gray-800 uppercase tracking-widest text-xs mb-4">Resumen de Caja</h3>
+                    
+                    <div className="grid grid-cols-2 gap-3 mb-5">
+                      <div className="bg-green-50 border-2 border-green-200 p-4 rounded-2xl">
+                        <p className="text-green-800 font-bold text-xs mb-1 uppercase tracking-wide">Efectivo Total</p>
+                        <p className="text-3xl font-black text-green-700">${calculateCorte().totalSales.toFixed(2)}</p>
+                      </div>
+                      <div className="bg-blue-50 border-2 border-blue-200 p-4 rounded-2xl">
+                        <p className="text-blue-800 font-bold text-xs mb-1 uppercase tracking-wide">Órdenes</p>
+                        <p className="text-3xl font-black text-blue-700">{calculateCorte().totalOrders}</p>
+                      </div>
                     </div>
-                    <div className="bg-blue-50 border-2 border-blue-200 p-4 rounded-2xl">
-                      <p className="text-blue-800 font-bold text-xs mb-1 uppercase tracking-wide">Órdenes</p>
-                      <p className="text-3xl font-black text-blue-700">{calculateCorte().totalOrders}</p>
+
+                    <div className="space-y-3 border-t border-gray-100 pt-4">
+                      <div className="flex justify-between text-sm font-bold text-gray-600"><span>🫓 Ventas Pupusas:</span><span className="text-gray-900">${calculateCorte().totalPupusas.toFixed(2)}</span></div>
+                      <div className="flex justify-between text-sm font-bold text-gray-600"><span>🥤 Ventas Bebidas:</span><span className="text-gray-900">${calculateCorte().totalBebidas.toFixed(2)}</span></div>
+                      <div className="flex justify-between text-sm font-bold text-gray-600"><span>🍰 Ventas Extras:</span><span className="text-gray-900">${calculateCorte().totalOtros.toFixed(2)}</span></div>
+                      <div className="flex justify-between text-sm font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-md"><span>🛵 Cobro de Envíos:</span><span className="text-purple-700">${calculateCorte().totalEnvios.toFixed(2)}</span></div>
                     </div>
+
+                    <button onClick={printCorteZ} className="w-full mt-6 bg-gray-900 text-white font-bold py-3.5 rounded-xl hover:bg-black transition shadow-lg flex items-center justify-center gap-2 active:scale-95">
+                      🖨️ Imprimir Corte Z
+                    </button>
                   </div>
+                )}
 
-                  <div className="space-y-3 border-t border-gray-100 pt-4">
-                    <div className="flex justify-between text-sm font-bold text-gray-600">
-                      <span>🫓 Ventas Pupusas:</span>
-                      <span className="text-gray-900">${calculateCorte().totalPupusas.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm font-bold text-gray-600">
-                      <span>🥤 Ventas Bebidas:</span>
-                      <span className="text-gray-900">${calculateCorte().totalBebidas.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm font-bold text-gray-600">
-                      <span>🍰 Ventas Extras:</span>
-                      <span className="text-gray-900">${calculateCorte().totalOtros.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-md">
-                      <span>🛵 Cobro de Envíos:</span>
-                      <span className="text-purple-700">${calculateCorte().totalEnvios.toFixed(2)}</span>
-                    </div>
-                  </div>
-
-                  <button 
-                    onClick={printCorteZ}
-                    className="w-full mt-6 bg-gray-900 text-white font-bold py-3.5 rounded-xl hover:bg-black transition shadow-lg flex items-center justify-center gap-2 active:scale-95"
-                  >
-                    🖨️ Imprimir Corte Z
-                  </button>
-                </div>
-
-                {/* AUDITORÍA CON FECHA COMPLETA */}
-                <div>
-                  <h3 className="font-black text-gray-800 uppercase tracking-widest text-xs mb-4">Auditoría de Pedidos</h3>
-                  
-                  {historyOrders.length === 0 ? (
-                    <div className="text-center py-10 bg-white rounded-2xl border border-gray-200 text-gray-400 font-medium text-sm">
-                      Aún no hay pedidos en este rango de tiempo.
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {historyOrders.map(order => {
-                        const fee = order.customer_info?.delivery_fee;
-                        return (
-                        <div key={order.id} className={`bg-white p-4 rounded-2xl shadow-sm border-l-4 ${order.status === 'delivered' ? 'border-green-500' : 'border-red-500'}`}>
-                          <div className="flex justify-between items-start mb-3 border-b border-gray-100 pb-3">
-                            <div>
-                              <span className="font-black text-lg text-gray-900 leading-none">
-                                {order.table_number} <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-md ml-1 text-gray-500">#{order.id.slice(0,4).toUpperCase()}</span>
-                              </span>
-                              {/* 💡 LA FECHA AHORA ES CLARA */}
-                              <p className="text-[10px] text-gray-500 font-mono mt-1 font-bold">{formatFullTime(order.created_at)}</p>
-                            </div>
-                            <div className="text-right">
-                              <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider ${
-                                order.status === 'delivered' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                              }`}>
-                                {order.status === 'delivered' ? '✅ Entregado' : '❌ Cancelado'}
-                              </span>
-                              <p className="font-black text-gray-900 mt-1">${order.total.toFixed(2)}</p>
-                            </div>
-                          </div>
-                          
-                          <div className="space-y-1.5">
-                            {groupItems(order.items).map((item: any, idx: number) => (
-                              <div key={idx} className="flex justify-between text-xs text-gray-600 bg-gray-50 p-1.5 rounded">
-                                <span><strong className="text-gray-900">{item.quantity}x</strong> {item.name} {item.dough ? `(${item.dough})` : ''}</span>
+                {/* VISTA 2: SOLO HISTORIAL */}
+                {targetView === 'history' && (
+                  <div className="animate-fade-in">
+                    <h3 className="font-black text-gray-800 uppercase tracking-widest text-xs mb-4">Auditoría Detallada</h3>
+                    {historyOrders.length === 0 ? (
+                      <div className="text-center py-10 bg-white rounded-2xl border border-gray-200 text-gray-400 font-medium text-sm">No hay pedidos en este rango.</div>
+                    ) : (
+                      <div className="space-y-4">
+                        {historyOrders.map(order => {
+                          const fee = order.customer_info?.delivery_fee;
+                          return (
+                          <div key={order.id} className={`bg-white p-4 rounded-2xl shadow-sm border-l-4 ${order.status === 'delivered' ? 'border-blue-500' : 'border-red-500'}`}>
+                            <div className="flex justify-between items-start mb-3 border-b border-gray-100 pb-3">
+                              <div>
+                                <span className="font-black text-lg text-gray-900 leading-none">{order.table_number} <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-md ml-1 text-gray-500">#{order.id.slice(0,4).toUpperCase()}</span></span>
+                                <p className="text-[10px] text-gray-500 font-mono mt-1 font-bold">{formatFullTime(order.created_at)}</p>
                               </div>
-                            ))}
-                            {fee > 0 && (
-                               <div className="flex justify-between text-xs text-purple-700 font-bold bg-purple-50 p-1.5 rounded">
-                                 <span>🛵 Tarifa de Envío</span>
-                                 <span>${fee.toFixed(2)}</span>
-                               </div>
-                            )}
+                              <div className="text-right">
+                                <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider ${order.status === 'delivered' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
+                                  {order.status === 'delivered' ? '✅ Entregado' : '❌ Cancelado'}
+                                </span>
+                                <p className="font-black text-gray-900 mt-1">${order.total.toFixed(2)}</p>
+                              </div>
+                            </div>
+                            <div className="space-y-1.5">
+                              {groupItems(order.items).map((item: any, idx: number) => (
+                                <div key={idx} className="flex justify-between text-xs text-gray-600 bg-gray-50 p-1.5 rounded">
+                                  <span><strong className="text-gray-900">{item.quantity}x</strong> {item.name} {item.dough ? `(${item.dough})` : ''}</span>
+                                </div>
+                              ))}
+                              {fee > 0 && (
+                                 <div className="flex justify-between text-xs text-purple-700 font-bold bg-purple-50 p-1.5 rounded"><span>🛵 Tarifa de Envío</span><span>${fee.toFixed(2)}</span></div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      )})}
-                    </div>
-                  )}
-                </div>
+                        )})}
+                      </div>
+                    )}
+                  </div>
+                )}
 
               </div>
             )}

@@ -82,15 +82,28 @@ export default function KitchenPage() {
 
       if (ordersData) setOrders(ordersData)
 
+      // 💡 ESCUCHAR INSERCIONES Y ACTUALIZACIONES
       const channel = supabase
         .channel('kitchen-orders')
         .on(
           'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restData.id}` },
+          { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restData.id}` },
           (payload) => {
-            if (payload.new.status === 'pending') {
+            if (payload.eventType === 'INSERT' && ['pending', 'cooking'].includes(payload.new.status)) {
               setOrders((prev) => [...prev, payload.new])
               playNotificationSound()
+            } else if (payload.eventType === 'UPDATE') {
+              if (['pending', 'cooking'].includes(payload.new.status)) {
+                // Actualiza visualmente si el mesero le metió más cosas
+                setOrders(prev => {
+                  const exists = prev.find(o => o.id === payload.new.id);
+                  if (exists) return prev.map(o => o.id === payload.new.id ? payload.new : o);
+                  return [...prev, payload.new]; 
+                });
+              } else {
+                // Si la cancelaron desde otro lado
+                setOrders(prev => prev.filter(o => o.id !== payload.new.id));
+              }
             }
           }
         )
@@ -115,7 +128,6 @@ export default function KitchenPage() {
     return new Date(isoString).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })
   }
 
-  // 💡 NUEVO: CALCULAR LA HORA PROMESA
   const getTargetTime = (created_at: string, wait_time: number | undefined) => {
     if (!wait_time) return null;
     const d = new Date(new Date(created_at).getTime() + wait_time * 60000);
@@ -142,7 +154,6 @@ export default function KitchenPage() {
         </div>
       )}
 
-      {/* HEADER COCINA (LIMPIO) */}
       <div className="bg-white p-4 rounded-xl shadow-sm mb-6 flex justify-between items-center border-l-8 border-orange-500 sticky top-4 z-10">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-3xl">👨‍🍳</div>
@@ -160,7 +171,6 @@ export default function KitchenPage() {
         </div>
       </div>
 
-      {/* GRILLA DE PEDIDOS ACTIVOS */}
       {orders.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-[60vh] text-gray-400">
           <div className="bg-white p-10 rounded-3xl shadow-sm border border-gray-200 text-center">
@@ -203,7 +213,6 @@ export default function KitchenPage() {
                     {order.status === 'pending' ? '⏳ POR CONFIRMAR' : '🔥 EN PLANCHA'}
                   </span>
                   
-                  {/* 💡 ETIQUETA DE HORA PROMESA EN COCINA */}
                   {targetTime && (
                     <div className="mt-2 inline-block bg-yellow-400 text-yellow-900 text-xs font-black px-2 py-1 rounded shadow-sm">
                       ⏱️ ENTREGAR: {targetTime}
@@ -215,7 +224,6 @@ export default function KitchenPage() {
                 </div>
               </div>
 
-              {/* LISTA DE ITEMS */}
               <div className="p-4 space-y-3 flex-1 overflow-y-auto max-h-80 bg-gray-50/50">
                 {groupItems(order.items).map((item: any, index: number) => (
                   <div key={index} className="flex justify-between items-center p-3 rounded-xl bg-white border border-gray-100 shadow-sm">
@@ -235,7 +243,6 @@ export default function KitchenPage() {
                 ))}
               </div>
 
-              {/* FOOTER ACCIONES */}
               <div className="p-4 bg-white border-t border-gray-100 space-y-3">
                 {order.status === 'pending' && (
                   <div className="grid grid-cols-2 gap-3">
@@ -249,9 +256,21 @@ export default function KitchenPage() {
                 )}
                 
                 {order.status === 'cooking' && (
-                  <button onClick={() => updateStatus(order.id, 'ready')} className="w-full bg-green-500 hover:bg-green-600 text-white font-black py-4 rounded-xl shadow-lg transition-all text-sm uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95">
-                    <span>➡️</span> PASAR A EMPAQUE
-                  </button>
+                  <div className="flex flex-col gap-3">
+                    
+                    {isDelivery && (
+                      <button 
+                        onClick={() => sendToDriver(order)}
+                        className="w-full bg-[#25D366] hover:bg-[#1DA851] text-white font-bold py-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-sm active:scale-95"
+                      >
+                        📲 Enviar a Motorista Waze
+                      </button>
+                    )}
+
+                    <button onClick={() => updateStatus(order.id, 'delivered')} className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-green-200 transition-all transform active:scale-95 text-xs uppercase tracking-wide">
+                      ✅ Entregar y Archivar
+                    </button>
+                  </div>
                 )}
               </div>
             </div>

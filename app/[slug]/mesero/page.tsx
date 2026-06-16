@@ -32,9 +32,11 @@ export default function WaiterPage() {
   const [countBebida, setCountBebida] = useState(1)
   
   const [searchTerm, setSearchTerm] = useState('')
-  
-  // 💡 NUEVO ESTADO: TIEMPO DE ESPERA (En minutos)
   const [waitTime, setWaitTime] = useState<number>(0)
+  
+  // 💡 NUEVO: DOMICILIO Y MESAS ACTIVAS
+  const [meseroDeliveryFee, setMeseroDeliveryFee] = useState('')
+  const [activeOrders, setActiveOrders] = useState<any[]>([])
 
   const { cart, addToCart, removeFromCart, total, clearCart } = useCartStore()
 
@@ -70,7 +72,20 @@ export default function WaiterPage() {
 
       const { data: menuData } = await supabase.from('menu_items').select('*').eq('restaurant_id', restData.id).eq('is_available', true)
       if (menuData) setMenu(menuData)
+
+      // CARGAR MESAS ACTIVAS
+      const { data: active } = await supabase.from('orders').select('*').eq('restaurant_id', restData.id).in('status', ['pending', 'cooking', 'ready'])
+      if (active) setActiveOrders(active)
+
+      // SUSCRIPCIÓN PARA MANTENER LAS MESAS ROJAS ACTUALIZADAS
+      const channel = supabase.channel('mesero-active')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restData.id}`}, async () => {
+           const { data: updated } = await supabase.from('orders').select('*').eq('restaurant_id', restData.id).in('status', ['pending', 'cooking', 'ready'])
+           if (updated) setActiveOrders(updated)
+        }).subscribe()
+
       setLoading(false)
+      return () => { supabase.removeChannel(channel) }
     }
     fetchData()
   }, [slug])
@@ -101,37 +116,63 @@ export default function WaiterPage() {
   const increaseQuantity = (item: any) => addToCart({ cartId: crypto.randomUUID(), id: item.id, name: item.name, price: item.price, dough: item.dough })
   const decreaseQuantity = (item: any) => { const lastId = item.cartIds[item.cartIds.length - 1]; if (lastId) removeFromCart(lastId) }
 
+  // 💡 LÓGICA INTELIGENTE: "AGREGAR A CUENTA" VS "NUEVO TICKET"
   const submitOrder = async () => {
     if (!selectedTable) { alert("⚠️ Selecciona una mesa primero"); return }
-    if (selectedTable === 'LLEVAR' && !takeoutName.trim()) { alert("⚠️ Ingresa el nombre para llevar."); return; }
+    if ((selectedTable === 'LLEVAR' || selectedTable === 'DOMICILIO') && !takeoutName.trim()) { alert("⚠️ Ingresa el nombre del cliente."); return; }
 
     setIsSubmitting(true)
-    const tableName = selectedTable === 'LLEVAR' ? `🛍️ LLEVAR: ${takeoutName.trim()}` : `Mesa ${selectedTable}`
+    
+    let tableName = '';
+    let orderType = 'local';
+    if (selectedTable === 'LLEVAR') { tableName = `🛍️ LLEVAR: ${takeoutName.trim()}`; orderType = 'takeout'; }
+    else if (selectedTable === 'DOMICILIO') { tableName = `🛵 DOMICILIO: ${takeoutName.trim()}`; orderType = 'delivery'; }
+    else { tableName = `Mesa ${selectedTable}`; }
 
-    // 💡 GUARDAMOS EL TIEMPO EN CUSTOM_INFO
-    const customerInfo = waitTime > 0 ? { wait_time: waitTime } : {};
+    // Búsqueda de mesa ocupada (Solo si no es para llevar/delivery, o si el nombre es exactamente igual)
+    const existingOrder = activeOrders.find(o => o.table_number === tableName);
 
-    const { data, error } = await supabase.from('orders').insert({
-      restaurant_id: restaurant.id, 
-      table_number: tableName, 
-      status: 'pending', 
-      total: total(), 
-      items: cart,
-      customer_info: customerInfo
-    }).select().single()
+    let customerInfo = waitTime > 0 ? { wait_time: waitTime } : {};
+    const extraFee = selectedTable === 'DOMICILIO' ? Number(meseroDeliveryFee || 0) : 0;
+
+    let responseData = null;
+
+    if (existingOrder) {
+      // 🔄 HACE UN UPDATE EN VEZ DE CREAR OTRO TICKET
+      const newItems = [...existingOrder.items, ...cart];
+      const newTotal = existingOrder.total + total() + extraFee;
+      
+      let updatedInfo = existingOrder.customer_info || {};
+      if (extraFee > 0) updatedInfo = { ...updatedInfo, delivery_fee: (updatedInfo.delivery_fee || 0) + extraFee };
+      if (waitTime > 0) updatedInfo = { ...updatedInfo, wait_time: waitTime };
+
+      const { data, error } = await supabase.from('orders').update({
+        items: newItems, total: newTotal, customer_info: updatedInfo
+      }).eq('id', existingOrder.id).select().single()
+
+      if (error) { alert("Error al actualizar la mesa"); setIsSubmitting(false); return; }
+      responseData = data;
+    } else {
+      // 🆕 CREA UNO NUEVO
+      if (extraFee > 0) customerInfo = { ...customerInfo, delivery_fee: extraFee } as any;
+
+      const { data, error } = await supabase.from('orders').insert({
+        restaurant_id: restaurant.id, table_number: tableName, order_type: orderType, status: 'pending', total: total() + extraFee, items: cart, customer_info: customerInfo
+      }).select().single()
+
+      if (error) { alert("Error al enviar"); setIsSubmitting(false); return; }
+      responseData = data;
+    }
 
     setIsSubmitting(false)
-    if (error) { alert("Error al enviar") } 
-    else {
-      setLastOrderTable(`${tableName} - #${data.id.slice(0,4).toUpperCase()}`); 
-      setShowSuccessToast(true); clearCart(); setShowCheckout(false); setSelectedTable(''); setTakeoutName(''); setWaitTime(0);
-      setTimeout(() => setShowSuccessToast(false), 2500)
-    }
+    setLastOrderTable(`${tableName} - #${responseData.id.slice(0,4).toUpperCase()}`); 
+    setShowSuccessToast(true); clearCart(); setShowCheckout(false); setSelectedTable(''); setTakeoutName(''); setWaitTime(0); setMeseroDeliveryFee('');
+    setTimeout(() => setShowSuccessToast(false), 2500)
   }
 
   const totalItemsModal = isPupusaItem(selectedItem) ? countMaiz + countArroz : countBebida
   const tableCount = restaurant?.table_count || 15;
-  const dynamicTables = [...Array.from({ length: tableCount }, (_, i) => (i + 1).toString()), 'LLEVAR']
+  const dynamicTables = [...Array.from({ length: tableCount }, (_, i) => (i + 1).toString()), 'LLEVAR', 'DOMICILIO']
 
   const filteredMenu = menu.filter(item => 
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -140,6 +181,8 @@ export default function WaiterPage() {
   
   const categoriesToRender = Array.from(new Set(filteredMenu.map(item => item.category)))
     .sort((a: any, b: any) => getCategoryWeight(a) - getCategoryWeight(b) || a.localeCompare(b));
+
+  const finalTotal = total() + (selectedTable === 'DOMICILIO' ? Number(meseroDeliveryFee || 0) : 0);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center font-bold text-gray-500 bg-gray-900 text-white">Cargando Sistema...</div>
   if (!restaurant) return <div className="min-h-screen flex items-center justify-center">Error: Restaurante no encontrado</div>
@@ -159,7 +202,7 @@ export default function WaiterPage() {
             <div className="flex justify-between items-center mb-4">
                 <div>
                     <h1 className="font-black text-xl leading-none text-orange-400">{restaurant.name}</h1>
-                    <p className="text-xs text-gray-400 mt-1 font-mono tracking-widest">PEDIDO EN MESA v1.2</p>
+                    <p className="text-xs text-gray-400 mt-1 font-mono tracking-widest">PEDIDO EN MESA v1.3</p>
                 </div>
                 <Link href={`/${slug}/admin`} className="bg-gray-800 border border-gray-700 px-3 py-2 rounded-lg text-xs font-bold hover:bg-gray-700 transition shadow-sm">
                     Cocina 👨‍🍳
@@ -167,16 +210,23 @@ export default function WaiterPage() {
             </div>
             
             <div className="flex gap-2 overflow-x-auto pb-3 no-scrollbar">
-                {dynamicTables.map(mesa => (
-                    <button key={mesa} onClick={() => setSelectedTable(mesa)} className={`flex-shrink-0 w-16 h-14 rounded-xl font-black text-lg transition-all border-2 flex items-center justify-center shadow-sm ${selectedTable === mesa ? 'bg-orange-600 border-orange-400 text-white scale-105 shadow-orange-500/50' : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'}`}>
-                        {mesa === 'LLEVAR' ? '🛍️' : mesa}
+                {dynamicTables.map(mesa => {
+                    // 💡 INDICADOR DE MESA OCUPADA (Solo para mesas físicas)
+                    const isTable = mesa !== 'LLEVAR' && mesa !== 'DOMICILIO';
+                    const isOccupied = isTable && activeOrders.some(o => o.table_number === `Mesa ${mesa}`);
+
+                    return (
+                    <button key={mesa} onClick={() => setSelectedTable(mesa)} className={`relative flex-shrink-0 w-16 h-14 rounded-xl font-black text-lg transition-all border-2 flex items-center justify-center shadow-sm ${selectedTable === mesa ? 'bg-orange-600 border-orange-400 text-white scale-105 shadow-orange-500/50' : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'}`}>
+                        {isOccupied && <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full animate-pulse border-2 border-gray-900"></div>}
+                        {mesa === 'LLEVAR' ? '🛍️' : mesa === 'DOMICILIO' ? '🛵' : mesa}
                     </button>
-                ))}
+                    )
+                })}
             </div>
             
             {selectedTable && (
                 <div className="bg-orange-500 text-white text-center text-sm font-black py-2 mt-1 rounded-lg uppercase tracking-widest shadow-inner">
-                    ORDEN: {selectedTable === 'LLEVAR' ? 'PARA LLEVAR' : `MESA ${selectedTable}`}
+                    {selectedTable === 'LLEVAR' ? '🛍️ PARA LLEVAR' : selectedTable === 'DOMICILIO' ? '🛵 A DOMICILIO' : `MESA ${selectedTable}`}
                 </div>
             )}
         </div>
@@ -194,9 +244,7 @@ export default function WaiterPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
             {searchTerm && (
-              <button onClick={() => setSearchTerm('')} className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white">
-                ✖️
-              </button>
+              <button onClick={() => setSearchTerm('')} className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white">✖️</button>
             )}
           </div>
         </div>
@@ -221,9 +269,7 @@ export default function WaiterPage() {
               <div className="grid grid-cols-2 gap-3">
                 {items.map((item: any) => (
                   <div key={item.id} onClick={() => handleItemClick(item)} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-300 active:scale-95 transition-transform cursor-pointer relative flex flex-col justify-between min-h-[110px] hover:border-orange-500">
-                    <div className="font-black text-gray-900 text-[15px] leading-snug mb-3">
-                        {item.name}
-                    </div>
+                    <div className="font-black text-gray-900 text-[15px] leading-snug mb-3">{item.name}</div>
                     <div className="flex justify-between items-center mt-auto">
                         <span className="text-sm text-gray-500 font-bold bg-gray-100 px-2 py-1 rounded-md border border-gray-200">${item.price.toFixed(2)}</span>
                         <div className="bg-orange-100 w-8 h-8 rounded-full flex items-center justify-center text-orange-600 font-black text-xl shadow-sm">+</div>
@@ -285,7 +331,7 @@ export default function WaiterPage() {
             <div className="bg-gray-900 text-white p-5 flex justify-between items-center shadow-lg rounded-t-3xl sm:rounded-t-2xl shrink-0">
                 <h2 className="text-2xl font-black flex flex-col leading-none">
                     <span>Confirmar Orden</span>
-                    <span className="text-sm text-orange-400 font-mono mt-1">{selectedTable ? (selectedTable === 'LLEVAR' ? '🛍️ PARA LLEVAR' : `MESA ${selectedTable}`) : '⚠️ SIN MESA'}</span>
+                    <span className="text-sm text-orange-400 font-mono mt-1">{selectedTable ? (selectedTable === 'LLEVAR' ? '🛍️ PARA LLEVAR' : selectedTable === 'DOMICILIO' ? '🛵 A DOMICILIO' : `MESA ${selectedTable}`) : '⚠️ SIN MESA'}</span>
                 </h2>
                 <button onClick={() => setShowCheckout(false)} className="text-gray-400 font-bold px-3 py-2 bg-gray-800 rounded-lg">Volver</button>
             </div>
@@ -308,39 +354,35 @@ export default function WaiterPage() {
 
             <div className="p-5 border-t-2 border-gray-200 bg-white pb-8 shrink-0">
                 
-                {selectedTable === 'LLEVAR' && (
+                {/* 💡 INPUTS PARA LLEVAR Y DOMICILIO */}
+                {(selectedTable === 'LLEVAR' || selectedTable === 'DOMICILIO') && (
                     <div className="mb-4 bg-orange-50 p-4 rounded-2xl border-2 border-orange-200">
-                        <label className="block text-sm font-black text-orange-800 mb-2 uppercase tracking-wide">Nombre del Cliente:</label>
+                        <label className="block text-xs font-black text-orange-800 mb-1 uppercase tracking-wide">Nombre del Cliente:</label>
                         <input 
-                            type="text" 
-                            placeholder="Ej: Don Carlos"
-                            className="w-full bg-white border-2 border-orange-300 rounded-xl p-3 outline-none focus:border-orange-500 font-black text-gray-800 text-lg shadow-inner"
-                            value={takeoutName}
-                            onChange={(e) => setTakeoutName(e.target.value)}
+                            type="text" placeholder="Ej: Don Carlos"
+                            className="w-full bg-white border-2 border-orange-300 rounded-xl p-3 outline-none focus:border-orange-500 font-black text-gray-800 text-base shadow-inner mb-3"
+                            value={takeoutName} onChange={(e) => setTakeoutName(e.target.value)}
                         />
+                        
+                        {/* 💡 TARIFA EXTRA SI ES DOMICILIO */}
+                        {selectedTable === 'DOMICILIO' && (
+                          <>
+                            <label className="block text-xs font-black text-purple-800 mb-1 uppercase tracking-wide">Costo del Delivery ($):</label>
+                            <input 
+                              type="number" step="0.25" placeholder="Ej: 2.50"
+                              className="w-full bg-white border-2 border-purple-300 rounded-xl p-3 outline-none focus:border-purple-500 font-black text-gray-800 text-base shadow-inner"
+                              value={meseroDeliveryFee} onChange={(e) => setMeseroDeliveryFee(e.target.value)}
+                            />
+                          </>
+                        )}
                     </div>
                 )}
 
-                {/* 💡 SELECTOR DE TIEMPO DE ESPERA */}
                 <div className="mb-5 bg-gray-50 p-3 rounded-2xl border border-gray-200">
                   <label className="block text-xs font-black text-gray-500 mb-2 uppercase tracking-wide">⏱️ Promesa de Entrega:</label>
                   <div className="flex gap-2">
-                    {[
-                      { label: 'Normal', val: 0 },
-                      { label: '20m', val: 20 },
-                      { label: '30m', val: 30 },
-                      { label: '45m', val: 45 },
-                      { label: '1h', val: 60 }
-                    ].map(btn => (
-                      <button
-                        key={btn.val}
-                        onClick={() => setWaitTime(btn.val)}
-                        className={`flex-1 py-2 rounded-lg font-bold text-xs transition-all border ${
-                          waitTime === btn.val 
-                            ? 'bg-yellow-100 border-yellow-400 text-yellow-800 shadow-sm' 
-                            : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-100'
-                        }`}
-                      >
+                    {[{ label: 'Normal', val: 0 }, { label: '20m', val: 20 }, { label: '30m', val: 30 }, { label: '45m', val: 45 }, { label: '1h', val: 60 }].map(btn => (
+                      <button key={btn.val} onClick={() => setWaitTime(btn.val)} className={`flex-1 py-2 rounded-lg font-bold text-xs transition-all border ${waitTime === btn.val ? 'bg-yellow-100 border-yellow-400 text-yellow-800 shadow-sm' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-100'}`}>
                         {btn.label}
                       </button>
                     ))}
@@ -349,16 +391,12 @@ export default function WaiterPage() {
 
                 <div className="flex justify-between text-3xl font-black mb-6 text-gray-900 bg-gray-100 p-4 rounded-2xl">
                     <span>Total:</span>
-                    <span className="text-orange-600">${total().toFixed(2)}</span>
+                    <span className="text-orange-600">${finalTotal.toFixed(2)}</span>
                 </div>
                 
                 <div className="grid grid-cols-4 gap-3 mb-4">
                     <button onClick={() => clearCart()} className="col-span-1 bg-red-100 text-red-600 font-black rounded-xl py-4 text-xs tracking-widest active:scale-95 transition-transform border border-red-200">BORRAR</button>
-                    <button 
-                        onClick={submitOrder}
-                        disabled={isSubmitting}
-                        className="col-span-3 bg-green-600 text-white font-black rounded-xl text-xl shadow-xl hover:bg-green-700 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
+                    <button onClick={submitOrder} disabled={isSubmitting} className="col-span-3 bg-green-600 text-white font-black rounded-xl text-xl shadow-xl hover:bg-green-700 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
                         {isSubmitting ? 'ENVIANDO...' : '🚀 ENVIAR ORDEN'}
                     </button>
                 </div>
@@ -381,7 +419,7 @@ export default function WaiterPage() {
                 <span className="bg-orange-500 px-4 py-1.5 rounded-full text-lg font-black">{cart.length}</span>
                 <span className="text-lg tracking-wide">VER ORDEN</span>
               </div>
-              <span className="text-2xl font-black text-orange-400">${total().toFixed(2)}</span>
+              <span className="text-2xl font-black text-orange-400">${finalTotal.toFixed(2)}</span>
             </button>
           </div>
         </div>

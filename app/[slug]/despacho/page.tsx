@@ -43,14 +43,12 @@ export default function DespachoPage() {
     }).catch(e => console.error(e))
   }
 
-  // 💡 CÁLCULO DE HORA PROMESA
   const getTargetTime = (created_at: string, wait_time: number | undefined) => {
     if (!wait_time) return null;
     const d = new Date(new Date(created_at).getTime() + wait_time * 60000);
     return d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' });
   }
 
-  // --- IMPRESIÓN CON HORA PROMESA ---
   const printTicket = (order: any) => {
     const items = groupItems(order.items)
     const shortCode = order.id.slice(0,4).toUpperCase()
@@ -102,7 +100,6 @@ export default function DespachoPage() {
     printWindow.document.close(); printWindow.focus(); printWindow.print(); printWindow.close()
   }
 
-  // --- LÓGICA DE TARIFAS Y WHATSAPP DOBLE ---
   const saveDeliveryFee = async (order: any) => {
     const feeStr = deliveryFees[order.id];
     if (!feeStr || isNaN(Number(feeStr))) return alert('Ingresa una tarifa válida en números.');
@@ -150,7 +147,6 @@ export default function DespachoPage() {
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   }
 
-  // --- CARGAR DATOS (SOLO READY) ---
   useEffect(() => {
     audioRef.current = new Audio(NOTIFICATION_SOUND)
 
@@ -167,15 +163,19 @@ export default function DespachoPage() {
 
       if (ordersData) setOrders(ordersData)
 
+      // 💡 ESCUCHAR TAMBIÉN ACTUALIZACIONES POR SI EL MESERO AGREGA BEBIDAS
       const channel = supabase.channel('despacho-orders')
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restData.id}` },
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restData.id}` },
           (payload) => {
-            if (payload.new.status === 'ready') {
+            if (payload.eventType === 'UPDATE' && payload.new.status === 'ready') {
               setOrders((prev) => {
-                if (!prev.find(o => o.id === payload.new.id)) return [...prev, payload.new]
-                return prev
+                const exists = prev.find(o => o.id === payload.new.id)
+                if (exists) return prev.map(o => o.id === payload.new.id ? payload.new : o);
+                playNotificationSound() 
+                return [...prev, payload.new]
               })
-              playNotificationSound() 
+            } else if (payload.eventType === 'UPDATE' && payload.new.status !== 'ready') {
+               setOrders((prev) => prev.filter(o => o.id !== payload.new.id))
             }
           }
         ).subscribe()
@@ -205,7 +205,6 @@ export default function DespachoPage() {
         </div>
       )}
 
-      {/* HEADER DESPACHO */}
       <div className="bg-white p-4 rounded-xl shadow-sm mb-6 flex justify-between items-center border-l-8 border-blue-500 sticky top-4 z-10">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-3xl">🛍️</div>
@@ -253,7 +252,6 @@ export default function DespachoPage() {
                   )}
                   <span className="text-[10px] uppercase font-bold tracking-widest opacity-80 mt-2">LISTO PARA EMPAQUE</span>
                   
-                  {/* 💡 ETIQUETA DE HORA PROMESA EN DESPACHO */}
                   {targetTime && (
                     <div className="mt-2 inline-block bg-yellow-400 text-yellow-900 text-xs font-black px-2 py-1 rounded shadow-sm">
                       ⏱️ PROMESA: {targetTime}
@@ -263,7 +261,6 @@ export default function DespachoPage() {
                 <div className="text-xs font-bold bg-black/20 px-2 py-1 rounded">{formatTime(order.created_at)}</div>
               </div>
 
-              {/* LISTA DE ITEMS */}
               <div className="p-4 space-y-3 flex-1 overflow-y-auto max-h-80 bg-gray-50/50">
                 {groupItems(order.items).map((item: any, index: number) => (
                   <div key={index} className="flex justify-between items-center p-3 rounded-xl bg-white border border-gray-100 shadow-sm">
