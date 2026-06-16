@@ -34,8 +34,9 @@ export default function WaiterPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [waitTime, setWaitTime] = useState<number>(0)
   
-  // 💡 NUEVO: DOMICILIO Y MESAS ACTIVAS
   const [meseroDeliveryFee, setMeseroDeliveryFee] = useState('')
+  const [customerPhone, setCustomerPhone] = useState('')
+  const [deliveryAddress, setDeliveryAddress] = useState('')
   const [activeOrders, setActiveOrders] = useState<any[]>([])
 
   const { cart, addToCart, removeFromCart, total, clearCart } = useCartStore()
@@ -73,11 +74,9 @@ export default function WaiterPage() {
       const { data: menuData } = await supabase.from('menu_items').select('*').eq('restaurant_id', restData.id).eq('is_available', true)
       if (menuData) setMenu(menuData)
 
-      // CARGAR MESAS ACTIVAS
       const { data: active } = await supabase.from('orders').select('*').eq('restaurant_id', restData.id).in('status', ['pending', 'cooking', 'ready'])
       if (active) setActiveOrders(active)
 
-      // SUSCRIPCIÓN PARA MANTENER LAS MESAS ROJAS ACTUALIZADAS
       const channel = supabase.channel('mesero-active')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restData.id}`}, async () => {
            const { data: updated } = await supabase.from('orders').select('*').eq('restaurant_id', restData.id).in('status', ['pending', 'cooking', 'ready'])
@@ -116,10 +115,10 @@ export default function WaiterPage() {
   const increaseQuantity = (item: any) => addToCart({ cartId: crypto.randomUUID(), id: item.id, name: item.name, price: item.price, dough: item.dough })
   const decreaseQuantity = (item: any) => { const lastId = item.cartIds[item.cartIds.length - 1]; if (lastId) removeFromCart(lastId) }
 
-  // 💡 LÓGICA INTELIGENTE: "AGREGAR A CUENTA" VS "NUEVO TICKET"
   const submitOrder = async () => {
     if (!selectedTable) { alert("⚠️ Selecciona una mesa primero"); return }
     if ((selectedTable === 'LLEVAR' || selectedTable === 'DOMICILIO') && !takeoutName.trim()) { alert("⚠️ Ingresa el nombre del cliente."); return; }
+    if (selectedTable === 'DOMICILIO' && !deliveryAddress.trim()) { alert("⚠️ Ingresa la dirección para el domicilio."); return; }
 
     setIsSubmitting(true)
     
@@ -129,22 +128,33 @@ export default function WaiterPage() {
     else if (selectedTable === 'DOMICILIO') { tableName = `🛵 DOMICILIO: ${takeoutName.trim()}`; orderType = 'delivery'; }
     else { tableName = `Mesa ${selectedTable}`; }
 
-    // Búsqueda de mesa ocupada (Solo si no es para llevar/delivery, o si el nombre es exactamente igual)
     const existingOrder = activeOrders.find(o => o.table_number === tableName);
-
-    let customerInfo = waitTime > 0 ? { wait_time: waitTime } : {};
     const extraFee = selectedTable === 'DOMICILIO' ? Number(meseroDeliveryFee || 0) : 0;
+
+    // 💡 Corrección ESLint: De let a const (ya que las propiedades mutan, pero el objeto es el mismo)
+    const customerInfo: any = {};
+    
+    if (waitTime > 0) customerInfo.wait_time = waitTime;
+    if (selectedTable === 'DOMICILIO') {
+      customerInfo.name = takeoutName.trim();
+      customerInfo.phone = customerPhone.trim();
+      customerInfo.address = deliveryAddress.trim();
+      if (extraFee > 0) customerInfo.delivery_fee = extraFee;
+    } else if (selectedTable === 'LLEVAR') {
+      customerInfo.name = takeoutName.trim();
+    }
 
     let responseData = null;
 
     if (existingOrder) {
-      // 🔄 HACE UN UPDATE EN VEZ DE CREAR OTRO TICKET
       const newItems = [...existingOrder.items, ...cart];
       const newTotal = existingOrder.total + total() + extraFee;
       
       let updatedInfo = existingOrder.customer_info || {};
       if (extraFee > 0) updatedInfo = { ...updatedInfo, delivery_fee: (updatedInfo.delivery_fee || 0) + extraFee };
       if (waitTime > 0) updatedInfo = { ...updatedInfo, wait_time: waitTime };
+      if (customerPhone) updatedInfo = { ...updatedInfo, phone: customerPhone };
+      if (deliveryAddress) updatedInfo = { ...updatedInfo, address: deliveryAddress };
 
       const { data, error } = await supabase.from('orders').update({
         items: newItems, total: newTotal, customer_info: updatedInfo
@@ -153,9 +163,6 @@ export default function WaiterPage() {
       if (error) { alert("Error al actualizar la mesa"); setIsSubmitting(false); return; }
       responseData = data;
     } else {
-      // 🆕 CREA UNO NUEVO
-      if (extraFee > 0) customerInfo = { ...customerInfo, delivery_fee: extraFee } as any;
-
       const { data, error } = await supabase.from('orders').insert({
         restaurant_id: restaurant.id, table_number: tableName, order_type: orderType, status: 'pending', total: total() + extraFee, items: cart, customer_info: customerInfo
       }).select().single()
@@ -166,7 +173,7 @@ export default function WaiterPage() {
 
     setIsSubmitting(false)
     setLastOrderTable(`${tableName} - #${responseData.id.slice(0,4).toUpperCase()}`); 
-    setShowSuccessToast(true); clearCart(); setShowCheckout(false); setSelectedTable(''); setTakeoutName(''); setWaitTime(0); setMeseroDeliveryFee('');
+    setShowSuccessToast(true); clearCart(); setShowCheckout(false); setSelectedTable(''); setTakeoutName(''); setWaitTime(0); setMeseroDeliveryFee(''); setCustomerPhone(''); setDeliveryAddress('');
     setTimeout(() => setShowSuccessToast(false), 2500)
   }
 
@@ -211,7 +218,6 @@ export default function WaiterPage() {
             
             <div className="flex gap-2 overflow-x-auto pb-3 no-scrollbar">
                 {dynamicTables.map(mesa => {
-                    // 💡 INDICADOR DE MESA OCUPADA (Solo para mesas físicas)
                     const isTable = mesa !== 'LLEVAR' && mesa !== 'DOMICILIO';
                     const isOccupied = isTable && activeOrders.some(o => o.table_number === `Mesa ${mesa}`);
 
@@ -354,27 +360,31 @@ export default function WaiterPage() {
 
             <div className="p-5 border-t-2 border-gray-200 bg-white pb-8 shrink-0">
                 
-                {/* 💡 INPUTS PARA LLEVAR Y DOMICILIO */}
-                {(selectedTable === 'LLEVAR' || selectedTable === 'DOMICILIO') && (
+                {selectedTable === 'LLEVAR' && (
                     <div className="mb-4 bg-orange-50 p-4 rounded-2xl border-2 border-orange-200">
                         <label className="block text-xs font-black text-orange-800 mb-1 uppercase tracking-wide">Nombre del Cliente:</label>
-                        <input 
-                            type="text" placeholder="Ej: Don Carlos"
-                            className="w-full bg-white border-2 border-orange-300 rounded-xl p-3 outline-none focus:border-orange-500 font-black text-gray-800 text-base shadow-inner mb-3"
-                            value={takeoutName} onChange={(e) => setTakeoutName(e.target.value)}
-                        />
-                        
-                        {/* 💡 TARIFA EXTRA SI ES DOMICILIO */}
-                        {selectedTable === 'DOMICILIO' && (
-                          <>
-                            <label className="block text-xs font-black text-purple-800 mb-1 uppercase tracking-wide">Costo del Delivery ($):</label>
-                            <input 
-                              type="number" step="0.25" placeholder="Ej: 2.50"
-                              className="w-full bg-white border-2 border-purple-300 rounded-xl p-3 outline-none focus:border-purple-500 font-black text-gray-800 text-base shadow-inner"
-                              value={meseroDeliveryFee} onChange={(e) => setMeseroDeliveryFee(e.target.value)}
-                            />
-                          </>
-                        )}
+                        <input type="text" placeholder="Ej: Don Carlos" className="w-full bg-white border-2 border-orange-300 rounded-xl p-3 outline-none focus:border-orange-500 font-black text-gray-800 text-base shadow-inner" value={takeoutName} onChange={(e) => setTakeoutName(e.target.value)} />
+                    </div>
+                )}
+
+                {selectedTable === 'DOMICILIO' && (
+                    <div className="mb-4 bg-purple-50 p-4 rounded-2xl border-2 border-purple-200 space-y-3">
+                        <div>
+                            <label className="block text-[10px] font-black text-purple-800 mb-1 uppercase tracking-wide">Nombre del Cliente:</label>
+                            <input type="text" placeholder="Ej: Doña María" className="w-full bg-white border border-purple-300 rounded-lg p-2.5 outline-none focus:border-purple-500 font-black text-gray-800 text-sm shadow-inner" value={takeoutName} onChange={(e) => setTakeoutName(e.target.value)} />
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-black text-purple-800 mb-1 uppercase tracking-wide">Teléfono (WhatsApp):</label>
+                            <input type="tel" placeholder="Ej: 7777-8888" className="w-full bg-white border border-purple-300 rounded-lg p-2.5 outline-none focus:border-purple-500 font-black text-gray-800 text-sm shadow-inner" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-black text-purple-800 mb-1 uppercase tracking-wide">Dirección/Referencia:</label>
+                            <textarea placeholder="Ej: Frente al parque, casa verde..." className="w-full bg-white border border-purple-300 rounded-lg p-2.5 outline-none focus:border-purple-500 font-black text-gray-800 text-sm shadow-inner resize-none h-16" value={deliveryAddress} onChange={(e) => setDeliveryAddress(e.target.value)}></textarea>
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-black text-purple-800 mb-1 uppercase tracking-wide">Costo de Envío ($):</label>
+                            <input type="number" step="0.25" placeholder="Ej: 2.50" className="w-full bg-white border border-purple-300 rounded-lg p-2.5 outline-none focus:border-purple-500 font-black text-gray-800 text-sm shadow-inner" value={meseroDeliveryFee} onChange={(e) => setMeseroDeliveryFee(e.target.value)} />
+                        </div>
                     </div>
                 )}
 

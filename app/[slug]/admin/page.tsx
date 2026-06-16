@@ -48,21 +48,6 @@ export default function KitchenPage() {
     }).catch(e => console.error(e))
   }
 
-  const sendToDriver = (order: any) => {
-    const info = order.customer_info || {};
-    const coordsStr = info.coords ? `${info.coords.lat},${info.coords.lng}` : '';
-    
-    const text = `🛵 *NUEVO VIAJE - PUPUSATECH* 🛵\n\n` +
-                 `👤 *Cliente:* ${info.name || order.table_number}\n` +
-                 `📞 *Teléfono:* ${info.phone || 'No provisto'}\n` +
-                 `💰 *Cobrar:* $${order.total.toFixed(2)} (Más tu envío)\n\n` +
-                 `🏠 *Referencia:* ${info.address || 'No provista'}\n` +
-                 (coordsStr ? `📍 *Ubicación GPS:* https://waze.com/ul?ll=${coordsStr}&navigate=yes` : '');
-
-    const encodedText = encodeURIComponent(text);
-    window.open(`https://wa.me/?text=${encodedText}`, '_blank');
-  }
-
   useEffect(() => {
     audioRef.current = new Audio(NOTIFICATION_SOUND)
 
@@ -82,7 +67,7 @@ export default function KitchenPage() {
 
       if (ordersData) setOrders(ordersData)
 
-      // 💡 ESCUCHAR INSERCIONES Y ACTUALIZACIONES
+      // 💡 ESCUCHAR INSERCIONES Y ACTUALIZACIONES DEL MESERO
       const channel = supabase
         .channel('kitchen-orders')
         .on(
@@ -94,14 +79,12 @@ export default function KitchenPage() {
               playNotificationSound()
             } else if (payload.eventType === 'UPDATE') {
               if (['pending', 'cooking'].includes(payload.new.status)) {
-                // Actualiza visualmente si el mesero le metió más cosas
                 setOrders(prev => {
                   const exists = prev.find(o => o.id === payload.new.id);
                   if (exists) return prev.map(o => o.id === payload.new.id ? payload.new : o);
                   return [...prev, payload.new]; 
                 });
               } else {
-                // Si la cancelaron desde otro lado
                 setOrders(prev => prev.filter(o => o.id !== payload.new.id));
               }
             }
@@ -115,9 +98,10 @@ export default function KitchenPage() {
     fetchInitialData()
   }, [slug])
 
+  // 💡 COCINA SOLO COCINA: pending -> cooking -> ready
   const updateStatus = async (orderId: string, newStatus: string) => {
     if (newStatus === 'ready' || newStatus === 'cancelled') {
-      setOrders(prev => prev.filter(o => o.id !== orderId))
+      setOrders(prev => prev.filter(o => o.id !== orderId)) // Desaparece para ir a Despacho
     } else {
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o))
     }
@@ -243,6 +227,7 @@ export default function KitchenPage() {
                 ))}
               </div>
 
+              {/* 💡 LA COCINA VUELVE A SU NATURALEZA (NO MÁS DELIVERY AQUÍ) */}
               <div className="p-4 bg-white border-t border-gray-100 space-y-3">
                 {order.status === 'pending' && (
                   <div className="grid grid-cols-2 gap-3">
@@ -256,21 +241,9 @@ export default function KitchenPage() {
                 )}
                 
                 {order.status === 'cooking' && (
-                  <div className="flex flex-col gap-3">
-                    
-                    {isDelivery && (
-                      <button 
-                        onClick={() => sendToDriver(order)}
-                        className="w-full bg-[#25D366] hover:bg-[#1DA851] text-white font-bold py-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-sm active:scale-95"
-                      >
-                        📲 Enviar a Motorista Waze
-                      </button>
-                    )}
-
-                    <button onClick={() => updateStatus(order.id, 'delivered')} className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-green-200 transition-all transform active:scale-95 text-xs uppercase tracking-wide">
-                      ✅ Entregar y Archivar
-                    </button>
-                  </div>
+                  <button onClick={() => updateStatus(order.id, 'ready')} className="w-full bg-green-500 hover:bg-green-600 text-white font-black py-4 rounded-xl shadow-lg transition-all text-sm uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95">
+                    <span>➡️</span> PASAR A EMPAQUE
+                  </button>
                 )}
               </div>
             </div>

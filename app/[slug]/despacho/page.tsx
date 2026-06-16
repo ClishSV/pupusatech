@@ -163,7 +163,6 @@ export default function DespachoPage() {
 
       if (ordersData) setOrders(ordersData)
 
-      // 💡 ESCUCHAR TAMBIÉN ACTUALIZACIONES POR SI EL MESERO AGREGA BEBIDAS
       const channel = supabase.channel('despacho-orders')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restData.id}` },
           (payload) => {
@@ -288,6 +287,8 @@ export default function DespachoPage() {
                     <p className="font-bold text-gray-700 flex items-start gap-2 leading-tight">
                       <span>🏠</span> <span>{customerInfo.address || 'Sin dirección escrita'}</span>
                     </p>
+                    
+                    {/* Botón de GPS SOLO SI HAY COORDENADAS (Modo Cliente) */}
                     {customerInfo.coords && (
                       <button 
                         onClick={() => window.open(`https://waze.com/ul?ll=${customerInfo.coords.lat},${customerInfo.coords.lng}&navigate=yes`, '_blank')}
