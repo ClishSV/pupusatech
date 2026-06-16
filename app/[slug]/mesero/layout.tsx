@@ -1,9 +1,10 @@
 import { Metadata } from 'next'
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
   return {
     title: "POS Mesero | PupusaTech",
-    manifest: `/api/manifest?slug=${params.slug}&mode=mesero`, // 💡 Pide la App de Mesero
+    manifest: `/api/manifest?slug=${slug}&mode=mesero`, 
   }
 }
 
