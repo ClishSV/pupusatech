@@ -3,44 +3,37 @@ import { Outfit } from "next/font/google";
 import "./globals.css";
 import PWARegister from "./PWARegister";
 
-// Configuramos la fuente original (Preservado)
 const outfit = Outfit({ 
   subsets: ["latin"],
   display: 'swap',
   variable: '--font-outfit',
 });
 
-// 💡 CONFIGURACIÓN DEL VIEWPORT (PWA y bloqueo de zoom automático en móviles)
 export const viewport: Viewport = {
-  themeColor: "#ea580c", // Naranja PupusaTech
+  themeColor: "#ea580c",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  userScalable: false, // Evita zoom molesto al tocar inputs en el celular
+  userScalable: false, 
 };
 
-// 💡 METADATA UNIFICADA (PWA y compatibilidad con iOS)
 export const metadata: Metadata = {
   title: "PupusaTech",
   description: "Sistema de pedidos para pupuserías",
-  manifest: "/manifest.json",
+  manifest: "/api/manifest", // 💡 Apuntamos a la API por defecto
   appleWebApp: {
-    capable: true, // Remueve la barra de navegación en iPhones
+    capable: true, 
     statusBarStyle: "default",
     title: "PupusaTech",
   },
   formatDetection: {
-    telephone: false, // Evita que iOS interprete números de mesa como llamadas
+    telephone: false, 
   }
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="es"> {/* 🇸🇻 Configurado en español para El Salvador */}
+    <html lang="es">
       <body className={outfit.className}>
         <PWARegister />
         {children}
