@@ -1,5 +1,5 @@
 /* eslint-disable */
-// Deshabilitamos ESLint para este archivo
+// Deshabilitamos ESLint para este archivo para evitar conflictos con las APIs de Service Worker que Next.js no reconoce
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
