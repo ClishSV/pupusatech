@@ -14,7 +14,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
   
-  // ESTADOS DEL CORTE Z
+  // ESTADOS DEL CORTE Z / HISTORIAL
   const [historyModalRest, setHistoryModalRest] = useState<any>(null)
   const [historyOrders, setHistoryOrders] = useState<any[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
@@ -22,8 +22,7 @@ export default function Dashboard() {
   // TURNOS Y VISTAS SEPARADAS
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
-  const [targetView, setTargetView] = useState<'corte' | 'history' | null>(null) // 💡 NUEVO ESTADO PARA SEPARAR VISTAS
-  const [pinAction, setPinAction] = useState<'corte' | 'history'>('corte')
+  const [targetView, setTargetView] = useState<'corte' | 'history' | null>(null)
   
   const [showPinModal, setShowPinModal] = useState(false)
   const [pinInput, setPinInput] = useState('')
@@ -64,12 +63,13 @@ export default function Dashboard() {
     return { from: `${todayStr}T00:00`, to: `${todayStr}T23:59` }
   }
 
+  // 💡 LÓGICA DE PIN: AHORA SOLO SE USA PARA EL CORTE Z
   const verifyPinAndLoadHistory = (e: React.FormEvent) => {
     e.preventDefault()
     const correctPin = pendingRestForHistory?.admin_pin || '1234'
     if (pinInput === correctPin) {
       setShowPinModal(false); setPinInput('');
-      setTargetView(pinAction); // Definimos qué ventana abrir
+      setTargetView('corte'); // Siempre abre el corte si pasó por el PIN
       const defaultDates = prepareDefaultDates()
       loadHistory(pendingRestForHistory, defaultDates.from, defaultDates.to) 
     } else {
@@ -242,12 +242,26 @@ export default function Dashboard() {
 
                   <div className="mt-auto space-y-3">
                     
-                    {/* 💡 AQUÍ ESTÁN LOS DOS BOTONES SEPARADOS */}
+                    {/* 💡 AQUÍ MODIFICAMOS EL COMPORTAMIENTO DE LOS BOTONES */}
                     <div className="grid grid-cols-2 gap-3 mb-2">
-                      <button onClick={() => { setPinAction('corte'); setPendingRestForHistory(rest); setShowPinModal(true); }} className="w-full bg-green-50 hover:bg-green-100 text-green-700 border-2 border-green-200 font-black py-3 rounded-xl transition-colors flex items-center justify-center gap-2 active:scale-95 text-xs uppercase tracking-widest">
+                      <button 
+                        onClick={() => { 
+                          setPendingRestForHistory(rest); 
+                          setShowPinModal(true); // Pide PIN
+                        }} 
+                        className="w-full bg-green-50 hover:bg-green-100 text-green-700 border-2 border-green-200 font-black py-3 rounded-xl transition-colors flex items-center justify-center gap-2 active:scale-95 text-xs uppercase tracking-widest"
+                      >
                         💰 CORTE Z
                       </button>
-                      <button onClick={() => { setPinAction('history'); setPendingRestForHistory(rest); setShowPinModal(true); }} className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 border-2 border-blue-200 font-black py-3 rounded-xl transition-colors flex items-center justify-center gap-2 active:scale-95 text-xs uppercase tracking-widest">
+                      
+                      <button 
+                        onClick={() => { 
+                          setTargetView('history'); 
+                          const defaultDates = prepareDefaultDates();
+                          loadHistory(rest, defaultDates.from, defaultDates.to); // Salta el PIN y carga
+                        }} 
+                        className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 border-2 border-blue-200 font-black py-3 rounded-xl transition-colors flex items-center justify-center gap-2 active:scale-95 text-xs uppercase tracking-widest"
+                      >
                         📜 HISTORIAL
                       </button>
                     </div>
@@ -282,7 +296,7 @@ export default function Dashboard() {
           <div className="bg-white rounded-3xl w-full max-w-xs shadow-2xl p-6 text-center animate-scale-up border-2 border-gray-100">
             <div className="text-5xl mb-4">🔒</div>
             <h3 className="text-2xl font-black text-gray-900 mb-2">Seguridad</h3>
-            <p className="text-sm text-gray-500 mb-6">Ingresa el PIN de dueño para ver esta sección.</p>
+            <p className="text-sm text-gray-500 mb-6">Ingresa el PIN de dueño para ver el dinero en caja.</p>
             
             <form onSubmit={verifyPinAndLoadHistory}>
               <input 
@@ -333,7 +347,6 @@ export default function Dashboard() {
             ) : (
               <div className="flex-1 overflow-y-auto p-5 bg-gray-50 space-y-6">
                 
-                {/* VISTA 1: SOLO CORTE Z */}
                 {targetView === 'corte' && (
                   <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-200 animate-fade-in">
                     <h3 className="font-black text-gray-800 uppercase tracking-widest text-xs mb-4">Resumen de Caja</h3>
@@ -362,7 +375,6 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* VISTA 2: SOLO HISTORIAL */}
                 {targetView === 'history' && (
                   <div className="animate-fade-in">
                     <h3 className="font-black text-gray-800 uppercase tracking-widest text-xs mb-4">Auditoría Detallada</h3>
@@ -412,6 +424,8 @@ export default function Dashboard() {
       <style jsx global>{`
         @keyframes slide-left { from { transform: translateX(100%); } to { transform: translateX(0); } }
         .animate-slide-left { animation: slide-left 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+        .animate-fade-in { animation: fade-in 0.2s ease-out; }
       `}</style>
     </div>
   )
