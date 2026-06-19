@@ -14,12 +14,10 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
   
-  // ESTADOS DEL CORTE Z / HISTORIAL
   const [historyModalRest, setHistoryModalRest] = useState<any>(null)
   const [historyOrders, setHistoryOrders] = useState<any[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
   
-  // TURNOS Y VISTAS SEPARADAS
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [targetView, setTargetView] = useState<'corte' | 'history' | null>(null)
@@ -40,7 +38,7 @@ export default function Dashboard() {
       if (!user) { router.push('/login'); return }
       setUser(user)
 
-      const { data: myRestaurants } = await supabase.from('restaurants').select('*').eq('owner_id', user.id) 
+      const { data: myRestaurants } = await supabase.from('restaurants').select('*').eq('owner_id', user.id).order('created_at', { ascending: true }) 
       if (myRestaurants) setRestaurants(myRestaurants)
       setLoading(false)
     }
@@ -63,13 +61,12 @@ export default function Dashboard() {
     return { from: `${todayStr}T00:00`, to: `${todayStr}T23:59` }
   }
 
-  // 💡 LÓGICA DE PIN: AHORA SOLO SE USA PARA EL CORTE Z
   const verifyPinAndLoadHistory = (e: React.FormEvent) => {
     e.preventDefault()
     const correctPin = pendingRestForHistory?.admin_pin || '1234'
     if (pinInput === correctPin) {
       setShowPinModal(false); setPinInput('');
-      setTargetView('corte'); // Siempre abre el corte si pasó por el PIN
+      setTargetView('corte'); 
       const defaultDates = prepareDefaultDates()
       loadHistory(pendingRestForHistory, defaultDates.from, defaultDates.to) 
     } else {
@@ -218,19 +215,33 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {restaurants.map((rest) => {
+            {restaurants.map((rest, index) => {
               const hasPhotoUrl = rest.logo_url && (rest.logo_url.startsWith('/') || rest.logo_url.startsWith('http'));
               const firstLetter = rest.name ? rest.name.charAt(0).toUpperCase() : '🍽️';
+              
+              // 💡 TEMAS DINÁMICOS PARA DISTINGUIR SUCURSALES
+              const theme = [
+                { badge: 'bg-orange-500', iconBg: 'from-orange-100 to-red-100', iconText: 'text-orange-600', ring: 'hover:ring-orange-500' },
+                { badge: 'bg-blue-500', iconBg: 'from-blue-100 to-cyan-100', iconText: 'text-blue-600', ring: 'hover:ring-blue-500' },
+                { badge: 'bg-purple-500', iconBg: 'from-purple-100 to-pink-100', iconText: 'text-purple-600', ring: 'hover:ring-purple-500' },
+                { badge: 'bg-green-500', iconBg: 'from-green-100 to-emerald-100', iconText: 'text-green-600', ring: 'hover:ring-green-500' },
+                { badge: 'bg-rose-500', iconBg: 'from-rose-100 to-orange-100', iconText: 'text-rose-600', ring: 'hover:ring-rose-500' }
+              ][index % 5];
 
               return (
-                <div key={rest.id} className="bg-white rounded-3xl p-6 shadow-md border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group flex flex-col">
+                <div key={rest.id} className={`bg-white rounded-3xl p-6 shadow-md border-2 border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group flex flex-col relative overflow-hidden ${theme.ring}`}>
                   
-                  <div className="flex items-center gap-4 mb-6">
-                    <div className="w-16 h-16 bg-gradient-to-br from-orange-100 to-red-100 rounded-2xl flex items-center justify-center text-3xl border-2 border-white shadow-sm overflow-hidden shrink-0 group-hover:scale-105 transition-transform">
-                      {hasPhotoUrl ? <img src={rest.logo_url} alt={rest.name} className="w-full h-full object-cover" /> : <span className="font-black text-orange-500">{rest.logo_url || firstLetter}</span>}
+                  {/* 💡 VIÑETA DE SUCURSAL */}
+                  <div className={`absolute top-0 right-0 ${theme.badge} text-white text-[10px] font-black px-4 py-1.5 rounded-bl-xl uppercase tracking-widest shadow-sm`}>
+                    Sucursal {index + 1}
+                  </div>
+
+                  <div className="flex items-center gap-4 mb-6 mt-2">
+                    <div className={`w-16 h-16 bg-gradient-to-br ${theme.iconBg} rounded-2xl flex items-center justify-center text-3xl border-2 border-white shadow-sm overflow-hidden shrink-0 group-hover:scale-105 transition-transform`}>
+                      {hasPhotoUrl ? <img src={rest.logo_url} alt={rest.name} className="w-full h-full object-cover" /> : <span className={`font-black ${theme.iconText}`}>{rest.logo_url || firstLetter}</span>}
                     </div>
                     <div>
-                      <h3 className="font-black text-xl text-gray-900 leading-tight line-clamp-2">{rest.name}</h3>
+                      <h3 className="font-black text-xl text-gray-900 leading-tight line-clamp-2 pr-4">{rest.name}</h3>
                       <div className="flex items-center gap-2 mt-2">
                         <div className={`w-2 h-2 rounded-full ${rest.status === 'active' ? 'bg-green-500' : 'bg-red-500'}`}></div>
                         <span className="text-xs text-gray-500 uppercase font-bold tracking-widest">
@@ -241,25 +252,15 @@ export default function Dashboard() {
                   </div>
 
                   <div className="mt-auto space-y-3">
-                    
-                    {/* 💡 AQUÍ MODIFICAMOS EL COMPORTAMIENTO DE LOS BOTONES */}
                     <div className="grid grid-cols-2 gap-3 mb-2">
                       <button 
-                        onClick={() => { 
-                          setPendingRestForHistory(rest); 
-                          setShowPinModal(true); // Pide PIN
-                        }} 
+                        onClick={() => { setPendingRestForHistory(rest); setShowPinModal(true); }} 
                         className="w-full bg-green-50 hover:bg-green-100 text-green-700 border-2 border-green-200 font-black py-3 rounded-xl transition-colors flex items-center justify-center gap-2 active:scale-95 text-xs uppercase tracking-widest"
                       >
                         💰 CORTE Z
                       </button>
-                      
                       <button 
-                        onClick={() => { 
-                          setTargetView('history'); 
-                          const defaultDates = prepareDefaultDates();
-                          loadHistory(rest, defaultDates.from, defaultDates.to); // Salta el PIN y carga
-                        }} 
+                        onClick={() => { setTargetView('history'); const defaultDates = prepareDefaultDates(); loadHistory(rest, defaultDates.from, defaultDates.to); }} 
                         className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 border-2 border-blue-200 font-black py-3 rounded-xl transition-colors flex items-center justify-center gap-2 active:scale-95 text-xs uppercase tracking-widest"
                       >
                         📜 HISTORIAL
@@ -271,7 +272,7 @@ export default function Dashboard() {
                         <span>👨‍🍳</span> Cocina
                       </Link>
                       <Link href={`/${rest.slug}/despacho`} className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-black py-3.5 rounded-xl shadow-md hover:shadow-blue-500/30 transition-all flex items-center justify-center gap-2 active:scale-95 text-sm">
-                        <span>🛍️</span> Caja
+                        <span>🛍️</span> Despacho
                       </Link>
                     </div>
                     
@@ -424,8 +425,6 @@ export default function Dashboard() {
       <style jsx global>{`
         @keyframes slide-left { from { transform: translateX(100%); } to { transform: translateX(0); } }
         .animate-slide-left { animation: slide-left 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-        .animate-fade-in { animation: fade-in 0.2s ease-out; }
       `}</style>
     </div>
   )

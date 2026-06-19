@@ -115,6 +115,21 @@ export default function WaiterPage() {
   const increaseQuantity = (item: any) => addToCart({ cartId: crypto.randomUUID(), id: item.id, name: item.name, price: item.price, dough: item.dough })
   const decreaseQuantity = (item: any) => { const lastId = item.cartIds[item.cartIds.length - 1]; if (lastId) removeFromCart(lastId) }
 
+  // 💡 FUNCIÓN PARA CARGAR UNA CUENTA ABIERTA
+  const handleLoadExistingOrder = (order: any) => {
+    let name = '';
+    if (order.order_type === 'takeout') name = order.table_number.replace('🛍️ LLEVAR: ', '');
+    else if (order.order_type === 'delivery') name = order.table_number.replace('🛵 DOMICILIO: ', '');
+    
+    setTakeoutName(name.trim());
+    if (order.customer_info) {
+        setCustomerPhone(order.customer_info.phone || '');
+        setDeliveryAddress(order.customer_info.address || '');
+        setWaitTime(order.customer_info.wait_time || 0);
+        // NO cargamos el meseroDeliveryFee para no cobrarlo dos veces en el UI
+    }
+  }
+
   const submitOrder = async () => {
     if (!selectedTable) { alert("⚠️ Selecciona una mesa primero"); return }
     if ((selectedTable === 'LLEVAR' || selectedTable === 'DOMICILIO') && !takeoutName.trim()) { alert("⚠️ Ingresa el nombre del cliente."); return; }
@@ -129,11 +144,11 @@ export default function WaiterPage() {
     else { tableName = `Mesa ${selectedTable}`; }
 
     const existingOrder = activeOrders.find(o => o.table_number === tableName);
-    const extraFee = selectedTable === 'DOMICILIO' ? Number(meseroDeliveryFee || 0) : 0;
-
-    // 💡 Corrección ESLint: De let a const (ya que las propiedades mutan, pero el objeto es el mismo)
-    const customerInfo: any = {};
     
+    // Si la orden ya existe, NO volvemos a cobrar el envío
+    const extraFee = (selectedTable === 'DOMICILIO' && !existingOrder) ? Number(meseroDeliveryFee || 0) : 0;
+
+    const customerInfo: any = {};
     if (waitTime > 0) customerInfo.wait_time = waitTime;
     if (selectedTable === 'DOMICILIO') {
       customerInfo.name = takeoutName.trim();
@@ -148,7 +163,7 @@ export default function WaiterPage() {
 
     if (existingOrder) {
       const newItems = [...existingOrder.items, ...cart];
-      const newTotal = existingOrder.total + total() + extraFee;
+      const newTotal = existingOrder.total + total() + extraFee; 
       
       let updatedInfo = existingOrder.customer_info || {};
       if (extraFee > 0) updatedInfo = { ...updatedInfo, delivery_fee: (updatedInfo.delivery_fee || 0) + extraFee };
@@ -189,7 +204,14 @@ export default function WaiterPage() {
   const categoriesToRender = Array.from(new Set(filteredMenu.map(item => item.category)))
     .sort((a: any, b: any) => getCategoryWeight(a) - getCategoryWeight(b) || a.localeCompare(b));
 
-  const finalTotal = total() + (selectedTable === 'DOMICILIO' ? Number(meseroDeliveryFee || 0) : 0);
+  const activeTakeoutOrders = activeOrders.filter(o => o.order_type === 'takeout');
+  const activeDeliveryOrders = activeOrders.filter(o => o.order_type === 'delivery');
+
+  // Detectamos si lo que el mesero está digitando coincide con una orden activa
+  const isAddingToExisting = activeOrders.some(o => o.table_number === (selectedTable === 'LLEVAR' ? `🛍️ LLEVAR: ${takeoutName.trim()}` : `🛵 DOMICILIO: ${takeoutName.trim()}`));
+  
+  // Total a mostrar en el carrito (Solo el carrito actual + el fee si es nuevo)
+  const finalTotal = total() + (selectedTable === 'DOMICILIO' && !isAddingToExisting ? Number(meseroDeliveryFee || 0) : 0);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center font-bold text-gray-500 bg-gray-900 text-white">Cargando Sistema...</div>
   if (!restaurant) return <div className="min-h-screen flex items-center justify-center">Error: Restaurante no encontrado</div>
@@ -209,20 +231,20 @@ export default function WaiterPage() {
             <div className="flex justify-between items-center mb-4">
                 <div>
                     <h1 className="font-black text-xl leading-none text-orange-400">{restaurant.name}</h1>
-                    <p className="text-xs text-gray-400 mt-1 font-mono tracking-widest">PEDIDO EN MESA v1.3</p>
+                    <p className="text-xs text-gray-400 mt-1 font-mono tracking-widest">PEDIDO EN MESA v1.4</p>
                 </div>
                 <Link href={`/${slug}/admin`} className="bg-gray-800 border border-gray-700 px-3 py-2 rounded-lg text-xs font-bold hover:bg-gray-700 transition shadow-sm">
                     Cocina 👨‍🍳
                 </Link>
             </div>
             
-            <div className="flex gap-2 overflow-x-auto pb-3 no-scrollbar">
+            <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
                 {dynamicTables.map(mesa => {
                     const isTable = mesa !== 'LLEVAR' && mesa !== 'DOMICILIO';
                     const isOccupied = isTable && activeOrders.some(o => o.table_number === `Mesa ${mesa}`);
 
                     return (
-                    <button key={mesa} onClick={() => setSelectedTable(mesa)} className={`relative flex-shrink-0 w-16 h-14 rounded-xl font-black text-lg transition-all border-2 flex items-center justify-center shadow-sm ${selectedTable === mesa ? 'bg-orange-600 border-orange-400 text-white scale-105 shadow-orange-500/50' : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'}`}>
+                    <button key={mesa} onClick={() => { setSelectedTable(mesa); setTakeoutName(''); }} className={`relative flex-shrink-0 w-16 h-14 rounded-xl font-black text-lg transition-all border-2 flex items-center justify-center shadow-sm ${selectedTable === mesa ? 'bg-orange-600 border-orange-400 text-white scale-105 shadow-orange-500/50' : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'}`}>
                         {isOccupied && <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full animate-pulse border-2 border-gray-900"></div>}
                         {mesa === 'LLEVAR' ? '🛍️' : mesa === 'DOMICILIO' ? '🛵' : mesa}
                     </button>
@@ -230,8 +252,32 @@ export default function WaiterPage() {
                 })}
             </div>
             
+            {/* 💡 CHIPS DE CUENTAS ABIERTAS (LLEVAR) */}
+            {selectedTable === 'LLEVAR' && activeTakeoutOrders.length > 0 && (
+                <div className="flex gap-2 items-center bg-gray-800 p-2 rounded-lg mt-1 overflow-x-auto no-scrollbar">
+                    <span className="text-[10px] uppercase font-bold text-gray-400 whitespace-nowrap">Cuentas:</span>
+                    {activeTakeoutOrders.map(o => (
+                        <button key={o.id} onClick={() => handleLoadExistingOrder(o)} className="bg-gray-700 text-white px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap hover:bg-orange-500 transition-colors">
+                            {o.table_number.replace('🛍️ LLEVAR: ', '')}
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            {/* 💡 CHIPS DE CUENTAS ABIERTAS (DOMICILIO) */}
+            {selectedTable === 'DOMICILIO' && activeDeliveryOrders.length > 0 && (
+                <div className="flex gap-2 items-center bg-gray-800 p-2 rounded-lg mt-1 overflow-x-auto no-scrollbar">
+                    <span className="text-[10px] uppercase font-bold text-gray-400 whitespace-nowrap">Cuentas:</span>
+                    {activeDeliveryOrders.map(o => (
+                        <button key={o.id} onClick={() => handleLoadExistingOrder(o)} className="bg-gray-700 text-white px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap hover:bg-orange-500 transition-colors">
+                            {o.table_number.replace('🛵 DOMICILIO: ', '')}
+                        </button>
+                    ))}
+                </div>
+            )}
+            
             {selectedTable && (
-                <div className="bg-orange-500 text-white text-center text-sm font-black py-2 mt-1 rounded-lg uppercase tracking-widest shadow-inner">
+                <div className="bg-orange-500 text-white text-center text-sm font-black py-2 mt-2 rounded-lg uppercase tracking-widest shadow-inner">
                     {selectedTable === 'LLEVAR' ? '🛍️ PARA LLEVAR' : selectedTable === 'DOMICILIO' ? '🛵 A DOMICILIO' : `MESA ${selectedTable}`}
                 </div>
             )}
@@ -334,7 +380,8 @@ export default function WaiterPage() {
       {showCheckout && (
         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-sm shadow-2xl h-[90vh] flex flex-col animate-slide-up">
-            <div className="bg-gray-900 text-white p-5 flex justify-between items-center shadow-lg rounded-t-3xl sm:rounded-t-2xl shrink-0">
+            
+            <div className="bg-gray-900 text-white p-5 flex justify-between items-center shadow-lg rounded-t-3xl sm:rounded-t-2xl shrink-0 z-10">
                 <h2 className="text-2xl font-black flex flex-col leading-none">
                     <span>Confirmar Orden</span>
                     <span className="text-sm text-orange-400 font-mono mt-1">{selectedTable ? (selectedTable === 'LLEVAR' ? '🛍️ PARA LLEVAR' : selectedTable === 'DOMICILIO' ? '🛵 A DOMICILIO' : `MESA ${selectedTable}`) : '⚠️ SIN MESA'}</span>
@@ -342,33 +389,36 @@ export default function WaiterPage() {
                 <button onClick={() => setShowCheckout(false)} className="text-gray-400 font-bold px-3 py-2 bg-gray-800 rounded-lg">Volver</button>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
-                {getGroupedCart().map((group: any) => (
-                    <div key={group.id + group.dough} className="flex justify-between items-center bg-white p-3 rounded-xl border-2 border-gray-200 shadow-sm">
-                        <div className="flex-1">
-                            <div className="font-black text-gray-800 text-lg leading-tight">{group.name}</div>
-                            <div className="text-xs text-orange-600 font-black uppercase tracking-widest mt-1">{group.dough}</div>
-                        </div>
-                        <div className="flex items-center gap-3 bg-gray-100 rounded-xl p-1 border border-gray-200 ml-2">
-                            <button onClick={() => decreaseQuantity(group)} className="w-10 h-10 flex items-center justify-center bg-white rounded-lg shadow-sm text-2xl font-black text-red-500 active:scale-95">-</button>
-                            <span className="font-black text-xl min-w-[24px] text-center text-gray-900">{group.quantity}</span>
-                            <button onClick={() => increaseQuantity(group)} className="w-10 h-10 flex items-center justify-center bg-white rounded-lg shadow-sm text-2xl font-black text-green-600 active:scale-95">+</button>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            <div className="p-5 border-t-2 border-gray-200 bg-white pb-8 shrink-0">
+            {/* 💡 EL CONTENIDO DESLIZABLE */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
                 
+                {/* 1. Lista de Carrito */}
+                <div className="space-y-3 mb-6">
+                  {getGroupedCart().map((group: any) => (
+                      <div key={group.id + group.dough} className="flex justify-between items-center bg-white p-3 rounded-xl border-2 border-gray-200 shadow-sm">
+                          <div className="flex-1">
+                              <div className="font-black text-gray-800 text-lg leading-tight">{group.name}</div>
+                              <div className="text-xs text-orange-600 font-black uppercase tracking-widest mt-1">{group.dough}</div>
+                          </div>
+                          <div className="flex items-center gap-3 bg-gray-100 rounded-xl p-1 border border-gray-200 ml-2">
+                              <button onClick={() => decreaseQuantity(group)} className="w-10 h-10 flex items-center justify-center bg-white rounded-lg shadow-sm text-2xl font-black text-red-500 active:scale-95">-</button>
+                              <span className="font-black text-xl min-w-[24px] text-center text-gray-900">{group.quantity}</span>
+                              <button onClick={() => increaseQuantity(group)} className="w-10 h-10 flex items-center justify-center bg-white rounded-lg shadow-sm text-2xl font-black text-green-600 active:scale-95">+</button>
+                          </div>
+                      </div>
+                  ))}
+                </div>
+
+                {/* 2. Formularios Dinámicos */}
                 {selectedTable === 'LLEVAR' && (
-                    <div className="mb-4 bg-orange-50 p-4 rounded-2xl border-2 border-orange-200">
+                    <div className="bg-orange-50 p-4 rounded-2xl border-2 border-orange-200">
                         <label className="block text-xs font-black text-orange-800 mb-1 uppercase tracking-wide">Nombre del Cliente:</label>
                         <input type="text" placeholder="Ej: Don Carlos" className="w-full bg-white border-2 border-orange-300 rounded-xl p-3 outline-none focus:border-orange-500 font-black text-gray-800 text-base shadow-inner" value={takeoutName} onChange={(e) => setTakeoutName(e.target.value)} />
                     </div>
                 )}
 
                 {selectedTable === 'DOMICILIO' && (
-                    <div className="mb-4 bg-purple-50 p-4 rounded-2xl border-2 border-purple-200 space-y-3">
+                    <div className="bg-purple-50 p-4 rounded-2xl border-2 border-purple-200 space-y-3">
                         <div>
                             <label className="block text-[10px] font-black text-purple-800 mb-1 uppercase tracking-wide">Nombre del Cliente:</label>
                             <input type="text" placeholder="Ej: Doña María" className="w-full bg-white border border-purple-300 rounded-lg p-2.5 outline-none focus:border-purple-500 font-black text-gray-800 text-sm shadow-inner" value={takeoutName} onChange={(e) => setTakeoutName(e.target.value)} />
@@ -381,14 +431,23 @@ export default function WaiterPage() {
                             <label className="block text-[10px] font-black text-purple-800 mb-1 uppercase tracking-wide">Dirección/Referencia:</label>
                             <textarea placeholder="Ej: Frente al parque, casa verde..." className="w-full bg-white border border-purple-300 rounded-lg p-2.5 outline-none focus:border-purple-500 font-black text-gray-800 text-sm shadow-inner resize-none h-16" value={deliveryAddress} onChange={(e) => setDeliveryAddress(e.target.value)}></textarea>
                         </div>
-                        <div>
-                            <label className="block text-[10px] font-black text-purple-800 mb-1 uppercase tracking-wide">Costo de Envío ($):</label>
-                            <input type="number" step="0.25" placeholder="Ej: 2.50" className="w-full bg-white border border-purple-300 rounded-lg p-2.5 outline-none focus:border-purple-500 font-black text-gray-800 text-sm shadow-inner" value={meseroDeliveryFee} onChange={(e) => setMeseroDeliveryFee(e.target.value)} />
-                        </div>
+                        
+                        {/* Solo pedimos envío si es una orden NUEVA */}
+                        {!isAddingToExisting ? (
+                          <div>
+                              <label className="block text-[10px] font-black text-purple-800 mb-1 uppercase tracking-wide">Costo de Envío ($):</label>
+                              <input type="number" step="0.25" placeholder="Ej: 2.50" className="w-full bg-white border border-purple-300 rounded-lg p-2.5 outline-none focus:border-purple-500 font-black text-gray-800 text-sm shadow-inner" value={meseroDeliveryFee} onChange={(e) => setMeseroDeliveryFee(e.target.value)} />
+                          </div>
+                        ) : (
+                          <div className="bg-purple-100 p-2 text-purple-700 text-xs font-bold rounded-lg text-center">
+                             El costo de envío ya está guardado en esta cuenta.
+                          </div>
+                        )}
                     </div>
                 )}
 
-                <div className="mb-5 bg-gray-50 p-3 rounded-2xl border border-gray-200">
+                {/* 3. Tiempo de Espera */}
+                <div className="bg-gray-50 p-3 rounded-2xl border border-gray-200">
                   <label className="block text-xs font-black text-gray-500 mb-2 uppercase tracking-wide">⏱️ Promesa de Entrega:</label>
                   <div className="flex gap-2">
                     {[{ label: 'Normal', val: 0 }, { label: '20m', val: 20 }, { label: '30m', val: 30 }, { label: '45m', val: 45 }, { label: '1h', val: 60 }].map(btn => (
@@ -399,15 +458,24 @@ export default function WaiterPage() {
                   </div>
                 </div>
 
-                <div className="flex justify-between text-3xl font-black mb-6 text-gray-900 bg-gray-100 p-4 rounded-2xl">
-                    <span>Total:</span>
-                    <span className="text-orange-600">${finalTotal.toFixed(2)}</span>
+            </div>
+
+            {/* 💡 EL FOOTER FIJO (NUNCA SE ESCONDE) */}
+            <div className="p-5 border-t-2 border-gray-200 bg-white shrink-0 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.1)] z-10">
+                
+                <div className="flex justify-between items-center mb-4 bg-gray-100 p-4 rounded-2xl">
+                    <span className="font-bold text-gray-500 uppercase tracking-widest text-xs">
+                      {isAddingToExisting ? 'Total a agregar:' : 'Total de Orden:'}
+                    </span>
+                    <span className="font-black text-3xl text-gray-900">${finalTotal.toFixed(2)}</span>
                 </div>
                 
-                <div className="grid grid-cols-4 gap-3 mb-4">
-                    <button onClick={() => clearCart()} className="col-span-1 bg-red-100 text-red-600 font-black rounded-xl py-4 text-xs tracking-widest active:scale-95 transition-transform border border-red-200">BORRAR</button>
-                    <button onClick={submitOrder} disabled={isSubmitting} className="col-span-3 bg-green-600 text-white font-black rounded-xl text-xl shadow-xl hover:bg-green-700 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-                        {isSubmitting ? 'ENVIANDO...' : '🚀 ENVIAR ORDEN'}
+                <div className="grid grid-cols-4 gap-3">
+                    <button onClick={() => clearCart()} className="col-span-1 bg-red-100 text-red-600 font-black rounded-xl py-4 text-xs tracking-widest active:scale-95 transition-transform border border-red-200 shadow-sm">
+                      BORRAR
+                    </button>
+                    <button onClick={submitOrder} disabled={isSubmitting} className="col-span-3 bg-green-600 text-white font-black rounded-xl text-xl shadow-lg hover:bg-green-700 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                        {isSubmitting ? 'ENVIANDO...' : (isAddingToExisting ? '🔄 ACTUALIZAR' : '🚀 ENVIAR ORDEN')}
                     </button>
                 </div>
             </div>
