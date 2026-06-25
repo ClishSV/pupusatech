@@ -18,6 +18,9 @@ export default function Dashboard() {
   const [historyOrders, setHistoryOrders] = useState<any[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
   
+  // 💡 NUEVO ESTADO: Mapa de productos para cruzar IDs y Categorías exactas
+  const [menuMap, setMenuMap] = useState<Record<string, any>>({})
+  
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [targetView, setTargetView] = useState<'corte' | 'history' | null>(null)
@@ -74,6 +77,7 @@ export default function Dashboard() {
     }
   }
 
+  // 💡 SE CARGAN LAS VENTAS Y EL MENÚ EXACTO PARA CRUCE DE DATOS
   const loadHistory = async (rest: any, fromStr: string, toStr: string) => {
     if(!fromStr || !toStr) return alert("Selecciona un rango de fecha y hora válido.")
     
@@ -83,7 +87,8 @@ export default function Dashboard() {
     const startDate = new Date(fromStr)
     const endDate = new Date(toStr)
 
-    const { data } = await supabase
+    // 1. Cargamos Pedidos
+    const { data: ordersData } = await supabase
       .from('orders')
       .select('*')
       .eq('restaurant_id', rest.id)
@@ -92,7 +97,19 @@ export default function Dashboard() {
       .lte('created_at', endDate.toISOString())
       .order('created_at', { ascending: false })
 
-    if (data) setHistoryOrders(data)
+    // 2. Cargamos el Menú Actual para auditar exactamente
+    const { data: menuData } = await supabase
+      .from('menu_items')
+      .select('*')
+      .eq('restaurant_id', rest.id)
+
+    if (menuData) {
+      const map: Record<string, any> = {}
+      menuData.forEach(item => { map[item.id] = item })
+      setMenuMap(map)
+    }
+
+    if (ordersData) setHistoryOrders(ordersData)
     setLoadingHistory(false)
   }
 
@@ -106,6 +123,7 @@ export default function Dashboard() {
     return Object.values(grouped)
   }
 
+  // 💡 CÁLCULO PRECISO BASADO EN LA BASE DE DATOS Y CON DESGLOSE DE EXTRAS
   const calculateCorte = () => {
     const delivered = historyOrders.filter(o => o.status === 'delivered')
     const totalSales = delivered.reduce((sum, order) => sum + order.total, 0)
@@ -114,22 +132,52 @@ export default function Dashboard() {
     let totalBebidas = 0;
     let totalOtros = 0;
     let totalEnvios = 0;
+    
+    // Objeto para llevar la cuenta exacta de los extras
+    const extrasDetails: Record<string, { name: string, qty: number, total: number }> = {};
 
     delivered.forEach(order => {
       const fee = order.customer_info?.delivery_fee || 0;
       totalEnvios += fee;
 
       order.items.forEach((item: any) => {
-        const isPupusa = item.dough || (item.category && item.category.toLowerCase().includes('pupusa')) || (item.category && item.category.toLowerCase().includes('tradicional')) || (item.name && item.name.toLowerCase().includes('pupusa'));
-        if (isPupusa) totalPupusas += item.price; 
-        else if (item.category?.toLowerCase().includes('bebida') || item.category?.toLowerCase().includes('soda') || item.category?.toLowerCase().includes('fresco')) totalBebidas += item.price;
-        else totalOtros += item.price;
+        // Consultamos la categoría EXACTA en la base de datos
+        const dbCategoryLower = (menuMap[item.id]?.category || item.category || '').toLowerCase();
+        
+        const isPupusa = item.dough || 
+                         dbCategoryLower.includes('pupusa') || 
+                         dbCategoryLower.includes('tradicional') || 
+                         (item.name && item.name.toLowerCase().includes('pupusa'));
+        
+        if (isPupusa) {
+          totalPupusas += item.price; 
+        } else if (dbCategoryLower.includes('bebida') || dbCategoryLower.includes('soda') || dbCategoryLower.includes('fresco')) {
+          totalBebidas += item.price;
+        } else {
+          totalOtros += item.price;
+          // Guardamos qué extra es y lo sumamos a la lista
+          if (extrasDetails[item.name]) {
+             extrasDetails[item.name].qty += 1;
+             extrasDetails[item.name].total += item.price;
+          } else {
+             extrasDetails[item.name] = { name: item.name, qty: 1, total: item.price };
+          }
+        }
       })
     })
 
-    return { totalSales, totalOrders: delivered.length, totalPupusas, totalBebidas, totalOtros, totalEnvios }
+    return { 
+      totalSales, 
+      totalOrders: delivered.length, 
+      totalPupusas, 
+      totalBebidas, 
+      totalOtros, 
+      totalEnvios,
+      extrasList: Object.values(extrasDetails) // Lo convertimos en arreglo para renderizarlo
+    }
   }
 
+  // 💡 IMPRESIÓN CON DESGLOSE DETALLADO DE EXTRAS
   const printCorteZ = () => {
     const stats = calculateCorte();
     const printWindow = window.open('', '', 'width=300,height=600')
@@ -144,6 +192,7 @@ export default function Dashboard() {
             .title { font-size: 18px; font-weight: bold; }
             .row { display: flex; justify-content: space-between; margin-bottom: 5px; }
             .total { border-top: 2px solid black; margin-top: 10px; padding-top: 5px; font-size: 16px; font-weight: bold; }
+            .extra-item { display: flex; justify-content: space-between; font-size: 10px; color: #444; margin-left: 10px; }
           </style>
         </head>
         <body>
@@ -159,6 +208,18 @@ export default function Dashboard() {
           <div class="row"><span>Ventas Pupusas:</span> <span>$${stats.totalPupusas.toFixed(2)}</span></div>
           <div class="row"><span>Ventas Bebidas:</span> <span>$${stats.totalBebidas.toFixed(2)}</span></div>
           <div class="row"><span>Ventas Extras/Postres:</span> <span>$${stats.totalOtros.toFixed(2)}</span></div>
+          
+          ${stats.extrasList.length > 0 ? `
+            <div style="margin-bottom: 5px; border-left: 1px solid #000; padding-left: 5px;">
+              ${stats.extrasList.map(extra => `
+                 <div class="extra-item">
+                   <span>${extra.qty}x ${extra.name}</span>
+                   <span>$${extra.total.toFixed(2)}</span>
+                 </div>
+              `).join('')}
+            </div>
+          ` : ''}
+
           <div class="row" style="color: #666;"><span>Ingreso por Envíos:</span> <span>$${stats.totalEnvios.toFixed(2)}</span></div>
           <br/>
           <div class="row total"><span>TOTAL EN CAJA:</span> <span>$${stats.totalSales.toFixed(2)}</span></div>
@@ -175,6 +236,9 @@ export default function Dashboard() {
   }
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50 font-bold text-gray-500">Cargando tu imperio... 🏰</div>
+
+  // Llama a la función solo si estamos en la vista de corte
+  const currentStats = (historyModalRest && targetView === 'corte') ? calculateCorte() : null;
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-800">
@@ -219,7 +283,6 @@ export default function Dashboard() {
               const hasPhotoUrl = rest.logo_url && (rest.logo_url.startsWith('/') || rest.logo_url.startsWith('http'));
               const firstLetter = rest.name ? rest.name.charAt(0).toUpperCase() : '🍽️';
               
-              // 💡 TEMAS DINÁMICOS PARA DISTINGUIR SUCURSALES
               const theme = [
                 { badge: 'bg-orange-500', iconBg: 'from-orange-100 to-red-100', iconText: 'text-orange-600', ring: 'hover:ring-orange-500' },
                 { badge: 'bg-blue-500', iconBg: 'from-blue-100 to-cyan-100', iconText: 'text-blue-600', ring: 'hover:ring-blue-500' },
@@ -231,7 +294,6 @@ export default function Dashboard() {
               return (
                 <div key={rest.id} className={`bg-white rounded-3xl p-6 shadow-md border-2 border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group flex flex-col relative overflow-hidden ${theme.ring}`}>
                   
-                  {/* 💡 VIÑETA DE SUCURSAL */}
                   <div className={`absolute top-0 right-0 ${theme.badge} text-white text-[10px] font-black px-4 py-1.5 rounded-bl-xl uppercase tracking-widest shadow-sm`}>
                     Sucursal {index + 1}
                   </div>
@@ -252,6 +314,7 @@ export default function Dashboard() {
                   </div>
 
                   <div className="mt-auto space-y-3">
+                    
                     <div className="grid grid-cols-2 gap-3 mb-2">
                       <button 
                         onClick={() => { setPendingRestForHistory(rest); setShowPinModal(true); }} 
@@ -259,6 +322,7 @@ export default function Dashboard() {
                       >
                         💰 CORTE Z
                       </button>
+                      
                       <button 
                         onClick={() => { setTargetView('history'); const defaultDates = prepareDefaultDates(); loadHistory(rest, defaultDates.from, defaultDates.to); }} 
                         className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 border-2 border-blue-200 font-black py-3 rounded-xl transition-colors flex items-center justify-center gap-2 active:scale-95 text-xs uppercase tracking-widest"
@@ -272,7 +336,7 @@ export default function Dashboard() {
                         <span>👨‍🍳</span> Cocina
                       </Link>
                       <Link href={`/${rest.slug}/despacho`} className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-black py-3.5 rounded-xl shadow-md hover:shadow-blue-500/30 transition-all flex items-center justify-center gap-2 active:scale-95 text-sm">
-                        <span>🛍️</span> Despacho
+                        <span>🛍️</span> Caja
                       </Link>
                     </div>
                     
@@ -348,26 +412,42 @@ export default function Dashboard() {
             ) : (
               <div className="flex-1 overflow-y-auto p-5 bg-gray-50 space-y-6">
                 
-                {targetView === 'corte' && (
+                {/* 💡 VISTA 1: CORTE Z CON DESGLOSE DE EXTRAS */}
+                {targetView === 'corte' && currentStats && (
                   <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-200 animate-fade-in">
                     <h3 className="font-black text-gray-800 uppercase tracking-widest text-xs mb-4">Resumen de Caja</h3>
                     
                     <div className="grid grid-cols-2 gap-3 mb-5">
                       <div className="bg-green-50 border-2 border-green-200 p-4 rounded-2xl">
                         <p className="text-green-800 font-bold text-xs mb-1 uppercase tracking-wide">Efectivo Total</p>
-                        <p className="text-3xl font-black text-green-700">${calculateCorte().totalSales.toFixed(2)}</p>
+                        <p className="text-3xl font-black text-green-700">${currentStats.totalSales.toFixed(2)}</p>
                       </div>
                       <div className="bg-blue-50 border-2 border-blue-200 p-4 rounded-2xl">
                         <p className="text-blue-800 font-bold text-xs mb-1 uppercase tracking-wide">Órdenes</p>
-                        <p className="text-3xl font-black text-blue-700">{calculateCorte().totalOrders}</p>
+                        <p className="text-3xl font-black text-blue-700">{currentStats.totalOrders}</p>
                       </div>
                     </div>
 
                     <div className="space-y-3 border-t border-gray-100 pt-4">
-                      <div className="flex justify-between text-sm font-bold text-gray-600"><span>🫓 Ventas Pupusas:</span><span className="text-gray-900">${calculateCorte().totalPupusas.toFixed(2)}</span></div>
-                      <div className="flex justify-between text-sm font-bold text-gray-600"><span>🥤 Ventas Bebidas:</span><span className="text-gray-900">${calculateCorte().totalBebidas.toFixed(2)}</span></div>
-                      <div className="flex justify-between text-sm font-bold text-gray-600"><span>🍰 Ventas Extras:</span><span className="text-gray-900">${calculateCorte().totalOtros.toFixed(2)}</span></div>
-                      <div className="flex justify-between text-sm font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-md"><span>🛵 Cobro de Envíos:</span><span className="text-purple-700">${calculateCorte().totalEnvios.toFixed(2)}</span></div>
+                      <div className="flex justify-between text-sm font-bold text-gray-600"><span>🫓 Ventas Pupusas:</span><span className="text-gray-900">${currentStats.totalPupusas.toFixed(2)}</span></div>
+                      <div className="flex justify-between text-sm font-bold text-gray-600"><span>🥤 Ventas Bebidas:</span><span className="text-gray-900">${currentStats.totalBebidas.toFixed(2)}</span></div>
+                      
+                      {/* 💡 DESGLOSE DE EXTRAS (Visual UI) */}
+                      <div className="flex flex-col text-sm font-bold text-gray-600">
+                        <div className="flex justify-between"><span>🍰 Ventas Extras:</span><span className="text-gray-900">${currentStats.totalOtros.toFixed(2)}</span></div>
+                        {currentStats.extrasList.length > 0 && (
+                          <div className="mt-2 pl-3 space-y-1.5 border-l-2 border-orange-300 bg-orange-50/50 p-2 rounded-r-lg">
+                            {currentStats.extrasList.map((extra, idx) => (
+                              <div key={idx} className="flex justify-between text-xs text-gray-500 font-medium">
+                                <span>{extra.qty}x {extra.name}</span>
+                                <span className="font-bold text-gray-700">${extra.total.toFixed(2)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex justify-between text-sm font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-md mt-2"><span>🛵 Cobro de Envíos:</span><span className="text-purple-700">${currentStats.totalEnvios.toFixed(2)}</span></div>
                     </div>
 
                     <button onClick={printCorteZ} className="w-full mt-6 bg-gray-900 text-white font-bold py-3.5 rounded-xl hover:bg-black transition shadow-lg flex items-center justify-center gap-2 active:scale-95">
@@ -376,6 +456,7 @@ export default function Dashboard() {
                   </div>
                 )}
 
+                {/* VISTA 2: SOLO HISTORIAL */}
                 {targetView === 'history' && (
                   <div className="animate-fade-in">
                     <h3 className="font-black text-gray-800 uppercase tracking-widest text-xs mb-4">Auditoría Detallada</h3>
@@ -425,6 +506,8 @@ export default function Dashboard() {
       <style jsx global>{`
         @keyframes slide-left { from { transform: translateX(100%); } to { transform: translateX(0); } }
         .animate-slide-left { animation: slide-left 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+        .animate-fade-in { animation: fade-in 0.2s ease-out; }
       `}</style>
     </div>
   )
