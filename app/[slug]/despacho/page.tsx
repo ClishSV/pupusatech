@@ -132,15 +132,22 @@ export default function DespachoPage() {
     window.open(`https://wa.me/${phone ? '503'+phone : ''}?text=${encodeURIComponent(text)}`, '_blank');
   }
 
+  // 💡 ACTUALIZADO: DESGLOSE DE COBRO SÚPER TRANSPARENTE PARA EL MOTORISTA
   const sendToDriver = (order: any) => {
     const info = order.customer_info || {};
     const shortCode = order.id.slice(0,4).toUpperCase();
     const coordsStr = info.coords ? `${info.coords.lat},${info.coords.lng}` : '';
     
+    const fee = info.delivery_fee || 0;
+    const subtotal = order.total - fee;
+
     const text = `🛵 *NUEVO VIAJE - ORDEN #${shortCode}* 🛵\n\n` +
                  `👤 *Cliente:* ${info.name || order.table_number}\n` +
-                 `📞 *Teléfono:* ${info.phone || 'No provisto'}\n` +
-                 `💰 *TOTAL A COBRAR: $${order.total.toFixed(2)}*\n\n` +
+                 `📞 *Teléfono:* ${info.phone || 'No provisto'}\n\n` +
+                 `🧾 *Desglose de Cobro:*\n` +
+                 `• Comida: $${subtotal.toFixed(2)}\n` +
+                 `• Tarifa de Envío (Tu pago): $${fee.toFixed(2)}\n` +
+                 `*TOTAL A COBRAR: $${order.total.toFixed(2)}*\n\n` +
                  `🏠 *Referencia:* ${info.address || 'No provista'}\n` +
                  (coordsStr ? `📍 *Ubicación GPS:* https://waze.com/ul?ll=${coordsStr}&navigate=yes` : '');
     
@@ -164,17 +171,14 @@ export default function DespachoPage() {
       if (ordersData) setOrders(ordersData)
 
       const channel = supabase.channel('despacho-orders')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restData.id}` },
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restData.id}` },
           (payload) => {
-            if (payload.eventType === 'UPDATE' && payload.new.status === 'ready') {
+            if (payload.new.status === 'ready') {
               setOrders((prev) => {
-                const exists = prev.find(o => o.id === payload.new.id)
-                if (exists) return prev.map(o => o.id === payload.new.id ? payload.new : o);
-                playNotificationSound() 
-                return [...prev, payload.new]
+                if (!prev.find(o => o.id === payload.new.id)) return [...prev, payload.new]
+                return prev
               })
-            } else if (payload.eventType === 'UPDATE' && payload.new.status !== 'ready') {
-               setOrders((prev) => prev.filter(o => o.id !== payload.new.id))
+              playNotificationSound() 
             }
           }
         ).subscribe()
@@ -204,6 +208,7 @@ export default function DespachoPage() {
         </div>
       )}
 
+      {/* HEADER DESPACHO */}
       <div className="bg-white p-4 rounded-xl shadow-sm mb-6 flex justify-between items-center border-l-8 border-blue-500 sticky top-4 z-10">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-3xl">🛍️</div>
@@ -260,6 +265,7 @@ export default function DespachoPage() {
                 <div className="text-xs font-bold bg-black/20 px-2 py-1 rounded">{formatTime(order.created_at)}</div>
               </div>
 
+              {/* LISTA DE ITEMS */}
               <div className="p-4 space-y-3 flex-1 overflow-y-auto max-h-80 bg-gray-50/50">
                 {groupItems(order.items).map((item: any, index: number) => (
                   <div key={index} className="flex justify-between items-center p-3 rounded-xl bg-white border border-gray-100 shadow-sm">
@@ -288,7 +294,6 @@ export default function DespachoPage() {
                       <span>🏠</span> <span>{customerInfo.address || 'Sin dirección escrita'}</span>
                     </p>
                     
-                    {/* Botón de GPS SOLO SI HAY COORDENADAS (Modo Cliente) */}
                     {customerInfo.coords && (
                       <button 
                         onClick={() => window.open(`https://waze.com/ul?ll=${customerInfo.coords.lat},${customerInfo.coords.lng}&navigate=yes`, '_blank')}

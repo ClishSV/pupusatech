@@ -11,17 +11,17 @@ const SUPER_ADMIN_EMAIL = "reldicadmin@pupusatech.com"
 
 // 💡 ETIQUETAS VISUALES PARA LAS CATEGORÍAS MAESTRAS
 const MASTER_LABELS: Record<string, string> = {
-  'PUPUSAS': '🫓 Pupusas',
-  'ENTRADAS': '🥗 Entradas',
-  'PLATOS_FUERTES': '🍛 Platos Fuertes',
-  'ANTOJITOS': '🥟 Antojitos',
-  'SOPAS': '🥣 Sopas',
-  'MEXICANA': '🌮 Mexicana',
-  'BEBIDAS': '🥤 Bebidas',
-  'POSTRES': '🍰 Postres',
-  'EXTRAS': '✨ Extras',
-  'PROMOCIONES': '🏷️ Promociones',
-  'OTROS': '🍽️ Otros'
+  'PUPUSAS': '🫓 Ventas Pupusas',
+  'ENTRADAS': '🥗 Ventas Entradas',
+  'PLATOS_FUERTES': '🍛 Ventas Platos Fuertes',
+  'ANTOJITOS': '🥟 Ventas Antojitos',
+  'SOPAS': '🥣 Ventas Sopas',
+  'MEXICANA': '🌮 Ventas Mexicana',
+  'BEBIDAS': '🥤 Ventas Bebidas',
+  'POSTRES': '🍰 Ventas Postres',
+  'EXTRAS': '✨ Ventas Extras',
+  'PROMOCIONES': '🏷️ Ventas Promociones',
+  'OTROS': '🍽️ Ventas Otros'
 };
 
 export default function Dashboard() {
@@ -33,7 +33,7 @@ export default function Dashboard() {
   const [historyOrders, setHistoryOrders] = useState<any[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
   
-  // 💡 MAPA DE PRODUCTOS PARA AUDITORÍA EXACTA
+  // MAPA DE PRODUCTOS PARA AUDITORÍA EXACTA
   const [menuMap, setMenuMap] = useState<Record<string, any>>({})
   
   const [dateFrom, setDateFrom] = useState('')
@@ -101,7 +101,6 @@ export default function Dashboard() {
     const startDate = new Date(fromStr)
     const endDate = new Date(toStr)
 
-    // 1. Descarga de Órdenes
     const { data: ordersData } = await supabase
       .from('orders')
       .select('*')
@@ -111,7 +110,6 @@ export default function Dashboard() {
       .lte('created_at', endDate.toISOString())
       .order('created_at', { ascending: false })
 
-    // 2. Descarga del Menú (Para cruzar la Categoría Maestra exacta)
     const { data: menuData } = await supabase
       .from('menu_items')
       .select('*')
@@ -137,13 +135,13 @@ export default function Dashboard() {
     return Object.values(grouped)
   }
 
-  // 💡 NUEVO CALCULO: AGRUPA DINÁMICAMENTE POR CATEGORÍA MAESTRA
   const calculateCorte = () => {
     const delivered = historyOrders.filter(o => o.status === 'delivered')
     const totalSales = delivered.reduce((sum, order) => sum + order.total, 0)
     
     const salesByCategory: Record<string, number> = {}
     const extrasDetails: Record<string, { name: string, qty: number, total: number }> = {}
+    const bebidasDetails: Record<string, { name: string, qty: number, total: number }> = {}
     let totalEnvios = 0;
 
     delivered.forEach(order => {
@@ -151,24 +149,32 @@ export default function Dashboard() {
       totalEnvios += fee;
 
       order.items.forEach((item: any) => {
-        // Buscamos la Categoría Maestra en el mapa. Si no existe, es OTROS.
         const masterCat = menuMap[item.id]?.master_category || 'OTROS';
         const price = item.price || 0;
 
-        // Sumar al total de esa Categoría
         if (salesByCategory[masterCat]) {
           salesByCategory[masterCat] += price;
         } else {
           salesByCategory[masterCat] = price;
         }
 
-        // Si es EXTRA, guardamos el desglose fino para evitar reclamos
+        // Desglose de EXTRAS
         if (masterCat === 'EXTRAS') {
           if (extrasDetails[item.name]) {
              extrasDetails[item.name].qty += 1;
              extrasDetails[item.name].total += price;
           } else {
              extrasDetails[item.name] = { name: item.name, qty: 1, total: price };
+          }
+        }
+        
+        // Desglose de BEBIDAS
+        if (masterCat === 'BEBIDAS') {
+          if (bebidasDetails[item.name]) {
+             bebidasDetails[item.name].qty += 1;
+             bebidasDetails[item.name].total += price;
+          } else {
+             bebidasDetails[item.name] = { name: item.name, qty: 1, total: price };
           }
         }
       })
@@ -179,7 +185,8 @@ export default function Dashboard() {
       totalOrders: delivered.length, 
       salesByCategory, 
       totalEnvios,
-      extrasList: Object.values(extrasDetails) 
+      extrasList: Object.values(extrasDetails),
+      bebidasList: Object.values(bebidasDetails)
     }
   }
 
@@ -188,18 +195,26 @@ export default function Dashboard() {
     const printWindow = window.open('', '', 'width=300,height=600')
     if (!printWindow) return
 
-    // Generar el HTML de las categorías dinámicas para imprimir
     const categoriesHtml = Object.entries(stats.salesByCategory)
       .filter(([_, total]) => (total as number) > 0)
       .map(([cat, total]) => {
         const label = MASTER_LABELS[cat] || cat;
-        let html = `<div class="row"><span>Ventas ${label}:</span> <span>$${(total as number).toFixed(2)}</span></div>`;
+        let html = `<div class="row"><span>${label}:</span> <span>$${(total as number).toFixed(2)}</span></div>`;
         
-        // Agregar desglose si es EXTRAS
+        // Detalle impreso de Extras
         if (cat === 'EXTRAS' && stats.extrasList.length > 0) {
           html += `<div style="margin-bottom: 5px; border-left: 1px solid #000; padding-left: 5px;">`;
           stats.extrasList.forEach(extra => {
              html += `<div class="extra-item"><span>${extra.qty}x ${extra.name}</span><span>$${extra.total.toFixed(2)}</span></div>`;
+          });
+          html += `</div>`;
+        }
+
+        // 💡 CORREGIDO: Detalle impreso de Bebidas usando sus variables correspondientes
+        if (cat === 'BEBIDAS' && stats.bebidasList.length > 0) {
+          html += `<div style="margin-bottom: 5px; border-left: 1px dashed #000; padding-left: 5px;">`;
+          stats.bebidasList.forEach(bebida => {
+             html += `<div class="extra-item"><span>${bebida.qty}x ${bebida.name}</span><span>$${bebida.total.toFixed(2)}</span></div>`;
           });
           html += `</div>`;
         }
@@ -345,8 +360,9 @@ export default function Dashboard() {
                       <Link href={`/${rest.slug}/admin`} className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white font-black py-3.5 rounded-xl shadow-md hover:shadow-orange-500/30 transition-all flex items-center justify-center gap-2 active:scale-95 text-sm">
                         <span>👨‍🍳</span> Cocina
                       </Link>
+                      
                       <Link href={`/${rest.slug}/despacho`} className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-black py-3.5 rounded-xl shadow-md hover:shadow-blue-500/30 transition-all flex items-center justify-center gap-2 active:scale-95 text-sm">
-                        <span>🛍️</span> Caja
+                        <span>🛍️</span> Despacho
                       </Link>
                     </div>
                     
@@ -422,7 +438,6 @@ export default function Dashboard() {
             ) : (
               <div className="flex-1 overflow-y-auto p-5 bg-gray-50 space-y-6">
                 
-                {/* 💡 VISTA 1: CORTE Z DINÁMICO */}
                 {targetView === 'corte' && currentStats && (
                   <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-200 animate-fade-in">
                     <h3 className="font-black text-gray-800 uppercase tracking-widest text-xs mb-4">Resumen de Caja</h3>
@@ -440,7 +455,6 @@ export default function Dashboard() {
 
                     <div className="space-y-3 border-t border-gray-100 pt-4">
                       
-                      {/* 💡 MAPEO DINÁMICO DE CATEGORÍAS MAESTRAS VENDIDAS */}
                       {Object.entries(currentStats.salesByCategory).map(([cat, total]) => {
                          if ((total as number) === 0) return null;
                          const label = MASTER_LABELS[cat] || cat;
@@ -452,7 +466,6 @@ export default function Dashboard() {
                                <span className="text-gray-900">${(total as number).toFixed(2)}</span>
                              </div>
                              
-                             {/* 💡 DESGLOSE SOLO PARA EXTRAS */}
                              {cat === 'EXTRAS' && currentStats.extrasList.length > 0 && (
                                <div className="mt-1.5 pl-3 space-y-1.5 border-l-2 border-orange-300 bg-orange-50/50 p-2 rounded-r-lg mb-1">
                                  {currentStats.extrasList.map((extra: any, idx: number) => (
@@ -463,14 +476,23 @@ export default function Dashboard() {
                                  ))}
                                </div>
                              )}
+
+                             {/* 💡 DETALLE DE BEBIDAS TOTALMENTE CORREGIDO */}
+                             {cat === 'BEBIDAS' && currentStats.bebidasList.length > 0 && (
+                               <div className="mt-1.5 pl-3 space-y-1.5 border-l-2 border-blue-300 bg-blue-50/50 p-2 rounded-r-lg mb-1">
+                                 {currentStats.bebidasList.map((bebida: any, idx: number) => (
+                                   <div key={idx} className="flex justify-between text-xs text-gray-500 font-medium">
+                                     <span>{bebida.qty}x {bebida.name}</span>
+                                     <span className="font-bold text-blue-700">${bebida.total.toFixed(2)}</span>
+                                   </div>
+                                 ))}
+                               </div>
+                             )}
                            </div>
                          )
                       })}
 
-                      <div className="flex justify-between text-sm font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-md mt-2">
-                        <span>🛵 Cobro de Envíos:</span>
-                        <span className="text-purple-700">${currentStats.totalEnvios.toFixed(2)}</span>
-                      </div>
+                      <div className="flex justify-between text-sm font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-md mt-2"><span>🛵 Cobro de Envíos:</span><span className="text-purple-700">${currentStats.totalEnvios.toFixed(2)}</span></div>
                     </div>
 
                     <button onClick={printCorteZ} className="w-full mt-6 bg-gray-900 text-white font-bold py-3.5 rounded-xl hover:bg-black transition shadow-lg flex items-center justify-center gap-2 active:scale-95">
