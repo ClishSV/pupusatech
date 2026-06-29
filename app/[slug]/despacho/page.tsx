@@ -43,12 +43,14 @@ export default function DespachoPage() {
     }).catch(e => console.error(e))
   }
 
+  // CÁLCULO DE HORA PROMESA
   const getTargetTime = (created_at: string, wait_time: number | undefined) => {
     if (!wait_time) return null;
     const d = new Date(new Date(created_at).getTime() + wait_time * 60000);
     return d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' });
   }
 
+  // --- IMPRESIÓN CON HORA PROMESA ---
   const printTicket = (order: any) => {
     const items = groupItems(order.items)
     const shortCode = order.id.slice(0,4).toUpperCase()
@@ -100,6 +102,7 @@ export default function DespachoPage() {
     printWindow.document.close(); printWindow.focus(); printWindow.print(); printWindow.close()
   }
 
+  // --- LÓGICA DE TARIFAS Y WHATSAPP DOBLE ---
   const saveDeliveryFee = async (order: any) => {
     const feeStr = deliveryFees[order.id];
     if (!feeStr || isNaN(Number(feeStr))) return alert('Ingresa una tarifa válida en números.');
@@ -132,7 +135,6 @@ export default function DespachoPage() {
     window.open(`https://wa.me/${phone ? '503'+phone : ''}?text=${encodeURIComponent(text)}`, '_blank');
   }
 
-  // 💡 ACTUALIZADO: DESGLOSE DE COBRO SÚPER TRANSPARENTE PARA EL MOTORISTA
   const sendToDriver = (order: any) => {
     const info = order.customer_info || {};
     const shortCode = order.id.slice(0,4).toUpperCase();
@@ -154,6 +156,14 @@ export default function DespachoPage() {
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   }
 
+  // LÓGICA DE GESTIÓN DE EMPAQUE (Evita colisión multi-usuario)
+  const togglePackingStatus = async (order: any, startPacking: boolean) => {
+    const updatedInfo = { ...order.customer_info, is_packing: startPacking };
+    
+    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, customer_info: updatedInfo } : o));
+    await supabase.from('orders').update({ customer_info: updatedInfo }).eq('id', order.id);
+  }
+
   useEffect(() => {
     audioRef.current = new Audio(NOTIFICATION_SOUND)
 
@@ -171,14 +181,22 @@ export default function DespachoPage() {
       if (ordersData) setOrders(ordersData)
 
       const channel = supabase.channel('despacho-orders')
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restData.id}` },
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `restaurant_id=eq.${restData.id}` },
           (payload) => {
-            if (payload.new.status === 'ready') {
-              setOrders((prev) => {
-                if (!prev.find(o => o.id === payload.new.id)) return [...prev, payload.new]
-                return prev
-              })
-              playNotificationSound() 
+            if (payload.eventType === 'INSERT' && payload.new.status === 'ready') {
+              setOrders((prev) => [...prev, payload.new])
+              playNotificationSound()
+            } else if (payload.eventType === 'UPDATE') {
+              if (payload.new.status === 'ready') {
+                setOrders((prev) => {
+                  const exists = prev.find(o => o.id === payload.new.id)
+                  if (exists) return prev.map(o => o.id === payload.new.id ? payload.new : o);
+                  playNotificationSound() 
+                  return [...prev, payload.new]
+                })
+              } else {
+                setOrders((prev) => prev.filter(o => o.id !== payload.new.id))
+              }
             }
           }
         ).subscribe()
@@ -191,6 +209,12 @@ export default function DespachoPage() {
   const deliverOrder = async (orderId: string) => {
     setOrders(prev => prev.filter(o => o.id !== orderId))
     await supabase.from('orders').update({ status: 'delivered' }).eq('id', orderId)
+  }
+
+  // 💡 NUEVA FUNCIÓN: ANULACIÓN DIRECTA DESDE DESPACHO
+  const cancelOrder = async (orderId: string) => {
+    setOrders(prev => prev.filter(o => o.id !== orderId))
+    await supabase.from('orders').update({ status: 'cancelled' }).eq('id', orderId)
   }
 
   const formatTime = (isoString: string) => new Date(isoString).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })
@@ -239,13 +263,20 @@ export default function DespachoPage() {
             
             const deliveryFee = customerInfo.delivery_fee;
             const hasFee = deliveryFee !== undefined && deliveryFee !== null;
-            
             const targetTime = getTargetTime(order.created_at, customerInfo.wait_time);
 
+            const isPacking = customerInfo.is_packing === true;
+
+            const theme = isDelivery 
+              ? { border: 'border-purple-500', header: 'bg-purple-600', ring: 'ring-4 ring-purple-500/30' }
+              : isTakeout 
+              ? { border: 'border-orange-500', header: 'bg-orange-600', ring: 'ring-4 ring-orange-500/30' }
+              : { border: 'border-blue-400', header: 'bg-blue-600', ring: '' };
+
             return (
-            <div key={order.id} className="bg-white rounded-2xl shadow-md overflow-hidden border-2 border-blue-400 flex flex-col">
+            <div key={order.id} className={`bg-white rounded-2xl shadow-md overflow-hidden border-2 transition-all flex flex-col ${theme.border} ${theme.ring} ${isPacking ? 'opacity-70 border-dashed bg-gray-50' : ''}`}>
               
-              <div className="bg-blue-600 p-4 text-white flex justify-between items-start">
+              <div className={`p-4 text-white flex justify-between items-start relative ${theme.header}`}>
                 <div className="flex flex-col">
                   <span className="font-black text-xl tracking-tight leading-tight flex items-center gap-2">
                     {isDelivery ? `🛵 Domicilio` : isTakeout ? `🛍️ Llevar` : order.table_number}
@@ -257,12 +288,18 @@ export default function DespachoPage() {
                   <span className="text-[10px] uppercase font-bold tracking-widest opacity-80 mt-2">LISTO PARA EMPAQUE</span>
                   
                   {targetTime && (
-                    <div className="mt-2 inline-block bg-yellow-400 text-yellow-900 text-xs font-black px-2 py-1 rounded shadow-sm">
+                    <div className="mt-2 inline-block bg-yellow-400 text-yellow-900 text-xs font-black px-2 py-1 rounded shadow-sm w-fit">
                       ⏱️ PROMESA: {targetTime}
                     </div>
                   )}
                 </div>
                 <div className="text-xs font-bold bg-black/20 px-2 py-1 rounded">{formatTime(order.created_at)}</div>
+
+                {isPacking && (
+                  <div className="absolute inset-0 bg-yellow-500/90 flex items-center justify-center z-10 animate-pulse text-yellow-950 font-black text-sm tracking-widest uppercase">
+                    ⚠️ EMPACANDO AHORA...
+                  </div>
+                )}
               </div>
 
               {/* LISTA DE ITEMS */}
@@ -293,7 +330,6 @@ export default function DespachoPage() {
                     <p className="font-bold text-gray-700 flex items-start gap-2 leading-tight">
                       <span>🏠</span> <span>{customerInfo.address || 'Sin dirección escrita'}</span>
                     </p>
-                    
                     {customerInfo.coords && (
                       <button 
                         onClick={() => window.open(`https://waze.com/ul?ll=${customerInfo.coords.lat},${customerInfo.coords.lng}&navigate=yes`, '_blank')}
@@ -354,14 +390,47 @@ export default function DespachoPage() {
                   </div>
                 )}
 
-                <div className="flex gap-2">
-                  <button onClick={() => printTicket(order)} className="w-14 bg-white border-2 border-gray-200 text-gray-600 font-bold py-2.5 rounded-xl hover:bg-gray-50 transition-all flex items-center justify-center text-lg active:scale-95">
-                    🖨️
-                  </button>
-                  <button onClick={() => deliverOrder(order.id)} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl shadow-lg transition-all text-sm uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95">
-                    ✅ ENTREGAR
-                  </button>
+                {/* SECCIÓN DE ACCIONES CON BLOQUEO MULTI-USUARIO */}
+                <div className="flex flex-col gap-2 border-t border-gray-100 pt-3">
+                  <div className="flex gap-2">
+                    {/* Botón de bloqueo de empaque */}
+                    {!isPacking ? (
+                      <button 
+                        onClick={() => togglePackingStatus(order, true)} 
+                        className="flex-1 bg-yellow-100 hover:bg-yellow-200 text-yellow-800 font-bold py-2 rounded-xl text-xs active:scale-95 transition-all shadow-sm"
+                      >
+                        📦 Empezar Empaque
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => togglePackingStatus(order, false)} 
+                        className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 rounded-xl text-xs active:scale-95 transition-all shadow-sm"
+                      >
+                        🔓 Liberar Pedido
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    {/* 💡 CORREGIDO: Llama a cancelOrder en lugar de updateStatus */}
+                    <button 
+                      onClick={() => { if(confirm('⚠️ ¿Deseas anular esta orden por abandono del cliente?')) cancelOrder(order.id) }} 
+                      className="bg-red-50 hover:bg-red-100 text-red-500 border border-red-200 px-3.5 py-2.5 rounded-xl font-bold active:scale-95 text-sm"
+                      title="Anular Pedido"
+                    >
+                      ✕
+                    </button>
+                    
+                    <button onClick={() => printTicket(order)} className="w-14 bg-white border-2 border-gray-200 text-gray-600 font-bold py-2.5 rounded-xl hover:bg-gray-50 transition-all flex items-center justify-center text-lg active:scale-95">
+                      🖨️
+                    </button>
+                    
+                    <button onClick={() => deliverOrder(order.id)} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl shadow-lg transition-all text-sm uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95">
+                      ✅ ENTREGAR
+                    </button>
+                  </div>
                 </div>
+                
               </div>
             </div>
           )})}
