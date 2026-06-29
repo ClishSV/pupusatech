@@ -9,6 +9,21 @@ import Link from 'next/link'
 
 const SUPER_ADMIN_EMAIL = "reldicadmin@pupusatech.com"
 
+// 💡 ETIQUETAS VISUALES PARA LAS CATEGORÍAS MAESTRAS
+const MASTER_LABELS: Record<string, string> = {
+  'PUPUSAS': '🫓 Pupusas',
+  'ENTRADAS': '🥗 Entradas',
+  'PLATOS_FUERTES': '🍛 Platos Fuertes',
+  'ANTOJITOS': '🥟 Antojitos',
+  'SOPAS': '🥣 Sopas',
+  'MEXICANA': '🌮 Mexicana',
+  'BEBIDAS': '🥤 Bebidas',
+  'POSTRES': '🍰 Postres',
+  'EXTRAS': '✨ Extras',
+  'PROMOCIONES': '🏷️ Promociones',
+  'OTROS': '🍽️ Otros'
+};
+
 export default function Dashboard() {
   const [restaurants, setRestaurants] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -18,7 +33,7 @@ export default function Dashboard() {
   const [historyOrders, setHistoryOrders] = useState<any[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
   
-  // 💡 NUEVO ESTADO: Mapa de productos para cruzar IDs y Categorías exactas
+  // 💡 MAPA DE PRODUCTOS PARA AUDITORÍA EXACTA
   const [menuMap, setMenuMap] = useState<Record<string, any>>({})
   
   const [dateFrom, setDateFrom] = useState('')
@@ -77,7 +92,6 @@ export default function Dashboard() {
     }
   }
 
-  // 💡 SE CARGAN LAS VENTAS Y EL MENÚ EXACTO PARA CRUCE DE DATOS
   const loadHistory = async (rest: any, fromStr: string, toStr: string) => {
     if(!fromStr || !toStr) return alert("Selecciona un rango de fecha y hora válido.")
     
@@ -87,7 +101,7 @@ export default function Dashboard() {
     const startDate = new Date(fromStr)
     const endDate = new Date(toStr)
 
-    // 1. Cargamos Pedidos
+    // 1. Descarga de Órdenes
     const { data: ordersData } = await supabase
       .from('orders')
       .select('*')
@@ -97,7 +111,7 @@ export default function Dashboard() {
       .lte('created_at', endDate.toISOString())
       .order('created_at', { ascending: false })
 
-    // 2. Cargamos el Menú Actual para auditar exactamente
+    // 2. Descarga del Menú (Para cruzar la Categoría Maestra exacta)
     const { data: menuData } = await supabase
       .from('menu_items')
       .select('*')
@@ -123,44 +137,38 @@ export default function Dashboard() {
     return Object.values(grouped)
   }
 
-  // 💡 CÁLCULO PRECISO BASADO EN LA BASE DE DATOS Y CON DESGLOSE DE EXTRAS
+  // 💡 NUEVO CALCULO: AGRUPA DINÁMICAMENTE POR CATEGORÍA MAESTRA
   const calculateCorte = () => {
     const delivered = historyOrders.filter(o => o.status === 'delivered')
     const totalSales = delivered.reduce((sum, order) => sum + order.total, 0)
     
-    let totalPupusas = 0;
-    let totalBebidas = 0;
-    let totalOtros = 0;
+    const salesByCategory: Record<string, number> = {}
+    const extrasDetails: Record<string, { name: string, qty: number, total: number }> = {}
     let totalEnvios = 0;
-    
-    // Objeto para llevar la cuenta exacta de los extras
-    const extrasDetails: Record<string, { name: string, qty: number, total: number }> = {};
 
     delivered.forEach(order => {
       const fee = order.customer_info?.delivery_fee || 0;
       totalEnvios += fee;
 
       order.items.forEach((item: any) => {
-        // Consultamos la categoría EXACTA en la base de datos
-        const dbCategoryLower = (menuMap[item.id]?.category || item.category || '').toLowerCase();
-        
-        const isPupusa = item.dough || 
-                         dbCategoryLower.includes('pupusa') || 
-                         dbCategoryLower.includes('tradicional') || 
-                         (item.name && item.name.toLowerCase().includes('pupusa'));
-        
-        if (isPupusa) {
-          totalPupusas += item.price; 
-        } else if (dbCategoryLower.includes('bebida') || dbCategoryLower.includes('soda') || dbCategoryLower.includes('fresco')) {
-          totalBebidas += item.price;
+        // Buscamos la Categoría Maestra en el mapa. Si no existe, es OTROS.
+        const masterCat = menuMap[item.id]?.master_category || 'OTROS';
+        const price = item.price || 0;
+
+        // Sumar al total de esa Categoría
+        if (salesByCategory[masterCat]) {
+          salesByCategory[masterCat] += price;
         } else {
-          totalOtros += item.price;
-          // Guardamos qué extra es y lo sumamos a la lista
+          salesByCategory[masterCat] = price;
+        }
+
+        // Si es EXTRA, guardamos el desglose fino para evitar reclamos
+        if (masterCat === 'EXTRAS') {
           if (extrasDetails[item.name]) {
              extrasDetails[item.name].qty += 1;
-             extrasDetails[item.name].total += item.price;
+             extrasDetails[item.name].total += price;
           } else {
-             extrasDetails[item.name] = { name: item.name, qty: 1, total: item.price };
+             extrasDetails[item.name] = { name: item.name, qty: 1, total: price };
           }
         }
       })
@@ -169,19 +177,34 @@ export default function Dashboard() {
     return { 
       totalSales, 
       totalOrders: delivered.length, 
-      totalPupusas, 
-      totalBebidas, 
-      totalOtros, 
+      salesByCategory, 
       totalEnvios,
-      extrasList: Object.values(extrasDetails) // Lo convertimos en arreglo para renderizarlo
+      extrasList: Object.values(extrasDetails) 
     }
   }
 
-  // 💡 IMPRESIÓN CON DESGLOSE DETALLADO DE EXTRAS
   const printCorteZ = () => {
     const stats = calculateCorte();
     const printWindow = window.open('', '', 'width=300,height=600')
     if (!printWindow) return
+
+    // Generar el HTML de las categorías dinámicas para imprimir
+    const categoriesHtml = Object.entries(stats.salesByCategory)
+      .filter(([_, total]) => (total as number) > 0)
+      .map(([cat, total]) => {
+        const label = MASTER_LABELS[cat] || cat;
+        let html = `<div class="row"><span>Ventas ${label}:</span> <span>$${(total as number).toFixed(2)}</span></div>`;
+        
+        // Agregar desglose si es EXTRAS
+        if (cat === 'EXTRAS' && stats.extrasList.length > 0) {
+          html += `<div style="margin-bottom: 5px; border-left: 1px solid #000; padding-left: 5px;">`;
+          stats.extrasList.forEach(extra => {
+             html += `<div class="extra-item"><span>${extra.qty}x ${extra.name}</span><span>$${extra.total.toFixed(2)}</span></div>`;
+          });
+          html += `</div>`;
+        }
+        return html;
+      }).join('');
 
     printWindow.document.write(`
       <html>
@@ -205,20 +228,8 @@ export default function Dashboard() {
           <br/>
           <div class="row"><span>Órdenes Entregadas:</span> <span>${stats.totalOrders}</span></div>
           <br/>
-          <div class="row"><span>Ventas Pupusas:</span> <span>$${stats.totalPupusas.toFixed(2)}</span></div>
-          <div class="row"><span>Ventas Bebidas:</span> <span>$${stats.totalBebidas.toFixed(2)}</span></div>
-          <div class="row"><span>Ventas Extras/Postres:</span> <span>$${stats.totalOtros.toFixed(2)}</span></div>
           
-          ${stats.extrasList.length > 0 ? `
-            <div style="margin-bottom: 5px; border-left: 1px solid #000; padding-left: 5px;">
-              ${stats.extrasList.map(extra => `
-                 <div class="extra-item">
-                   <span>${extra.qty}x ${extra.name}</span>
-                   <span>$${extra.total.toFixed(2)}</span>
-                 </div>
-              `).join('')}
-            </div>
-          ` : ''}
+          ${categoriesHtml}
 
           <div class="row" style="color: #666;"><span>Ingreso por Envíos:</span> <span>$${stats.totalEnvios.toFixed(2)}</span></div>
           <br/>
@@ -237,7 +248,6 @@ export default function Dashboard() {
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50 font-bold text-gray-500">Cargando tu imperio... 🏰</div>
 
-  // Llama a la función solo si estamos en la vista de corte
   const currentStats = (historyModalRest && targetView === 'corte') ? calculateCorte() : null;
 
   return (
@@ -412,7 +422,7 @@ export default function Dashboard() {
             ) : (
               <div className="flex-1 overflow-y-auto p-5 bg-gray-50 space-y-6">
                 
-                {/* 💡 VISTA 1: CORTE Z CON DESGLOSE DE EXTRAS */}
+                {/* 💡 VISTA 1: CORTE Z DINÁMICO */}
                 {targetView === 'corte' && currentStats && (
                   <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-200 animate-fade-in">
                     <h3 className="font-black text-gray-800 uppercase tracking-widest text-xs mb-4">Resumen de Caja</h3>
@@ -429,25 +439,38 @@ export default function Dashboard() {
                     </div>
 
                     <div className="space-y-3 border-t border-gray-100 pt-4">
-                      <div className="flex justify-between text-sm font-bold text-gray-600"><span>🫓 Ventas Pupusas:</span><span className="text-gray-900">${currentStats.totalPupusas.toFixed(2)}</span></div>
-                      <div className="flex justify-between text-sm font-bold text-gray-600"><span>🥤 Ventas Bebidas:</span><span className="text-gray-900">${currentStats.totalBebidas.toFixed(2)}</span></div>
                       
-                      {/* 💡 DESGLOSE DE EXTRAS (Visual UI) */}
-                      <div className="flex flex-col text-sm font-bold text-gray-600">
-                        <div className="flex justify-between"><span>🍰 Ventas Extras:</span><span className="text-gray-900">${currentStats.totalOtros.toFixed(2)}</span></div>
-                        {currentStats.extrasList.length > 0 && (
-                          <div className="mt-2 pl-3 space-y-1.5 border-l-2 border-orange-300 bg-orange-50/50 p-2 rounded-r-lg">
-                            {currentStats.extrasList.map((extra, idx) => (
-                              <div key={idx} className="flex justify-between text-xs text-gray-500 font-medium">
-                                <span>{extra.qty}x {extra.name}</span>
-                                <span className="font-bold text-gray-700">${extra.total.toFixed(2)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                      {/* 💡 MAPEO DINÁMICO DE CATEGORÍAS MAESTRAS VENDIDAS */}
+                      {Object.entries(currentStats.salesByCategory).map(([cat, total]) => {
+                         if ((total as number) === 0) return null;
+                         const label = MASTER_LABELS[cat] || cat;
+                         
+                         return (
+                           <div key={cat} className="flex flex-col">
+                             <div className="flex justify-between text-sm font-bold text-gray-600">
+                               <span>{label}:</span>
+                               <span className="text-gray-900">${(total as number).toFixed(2)}</span>
+                             </div>
+                             
+                             {/* 💡 DESGLOSE SOLO PARA EXTRAS */}
+                             {cat === 'EXTRAS' && currentStats.extrasList.length > 0 && (
+                               <div className="mt-1.5 pl-3 space-y-1.5 border-l-2 border-orange-300 bg-orange-50/50 p-2 rounded-r-lg mb-1">
+                                 {currentStats.extrasList.map((extra: any, idx: number) => (
+                                   <div key={idx} className="flex justify-between text-xs text-gray-500 font-medium">
+                                     <span>{extra.qty}x {extra.name}</span>
+                                     <span className="font-bold text-gray-700">${extra.total.toFixed(2)}</span>
+                                   </div>
+                                 ))}
+                               </div>
+                             )}
+                           </div>
+                         )
+                      })}
 
-                      <div className="flex justify-between text-sm font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-md mt-2"><span>🛵 Cobro de Envíos:</span><span className="text-purple-700">${currentStats.totalEnvios.toFixed(2)}</span></div>
+                      <div className="flex justify-between text-sm font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-md mt-2">
+                        <span>🛵 Cobro de Envíos:</span>
+                        <span className="text-purple-700">${currentStats.totalEnvios.toFixed(2)}</span>
+                      </div>
                     </div>
 
                     <button onClick={printCorteZ} className="w-full mt-6 bg-gray-900 text-white font-bold py-3.5 rounded-xl hover:bg-black transition shadow-lg flex items-center justify-center gap-2 active:scale-95">
@@ -456,7 +479,7 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* VISTA 2: SOLO HISTORIAL */}
+                {/* VISTA 2: HISTORIAL */}
                 {targetView === 'history' && (
                   <div className="animate-fade-in">
                     <h3 className="font-black text-gray-800 uppercase tracking-widest text-xs mb-4">Auditoría Detallada</h3>
