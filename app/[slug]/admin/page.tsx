@@ -22,6 +22,11 @@ const MASTER_LABELS: Record<string, string> = {
   'OTROS': '🍽️ Otros'
 };
 
+const ALL_CATEGORIES = [
+  'PUPUSAS', 'ENTRADAS', 'PLATOS_FUERTES', 'ANTOJITOS', 'SOPAS', 'MEXICANA', 'BEBIDAS', 'POSTRES', 'EXTRAS', 'PROMOCIONES', 'OTROS'
+];
+const ALL_TYPES = ['local', 'takeout', 'delivery'];
+
 export default function KitchenPage() {
   const params = useParams()
   const slug = params?.slug as string
@@ -37,10 +42,8 @@ export default function KitchenPage() {
   const [showFilters, setShowFilters] = useState(false)
 
   // ESTADOS DE FILTRO PERSONALIZADO POR ESTACIÓN
-  const [filterTypes, setFilterTypes] = useState<string[]>(['local', 'takeout', 'delivery'])
-  const [filterCategories, setFilterCategories] = useState<string[]>([
-    'PUPUSAS', 'ENTRADAS', 'PLATOS_FUERTES', 'ANTOJITOS', 'SOPAS', 'MEXICANA', 'BEBIDAS', 'POSTRES', 'EXTRAS', 'PROMOCIONES', 'OTROS'
-  ])
+  const [filterTypes, setFilterTypes] = useState<string[]>(ALL_TYPES)
+  const [filterCategories, setFilterCategories] = useState<string[]>(ALL_CATEGORIES)
 
   const groupItems = (items: any[]) => {
     const grouped: Record<string, any> = {}
@@ -164,9 +167,15 @@ export default function KitchenPage() {
     setFilterCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat])
   }
 
+  // 💡 RESTABLECER TODOS LOS FILTROS DE UN GOLPE (Corregido y usado)
+  const handleResetFilters = () => {
+    setFilterTypes(ALL_TYPES);
+    setFilterCategories(ALL_CATEGORIES);
+  }
+
   if (!restaurant) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="text-center"><div className="text-6xl mb-4 animate-bounce">👨‍🍳</div><p className="text-xl text-gray-600 font-semibold">Cargando cocina...</p></div>
+      <div className="text-center"><div className="text-6xl mb-4 animate-bounce">🍳</div><p className="text-xl text-gray-600 font-semibold">Cargando cocina...</p></div>
     </div>
   )
 
@@ -199,7 +208,6 @@ export default function KitchenPage() {
           </div>
           
           <div className="flex items-center gap-2">
-            {/* 💡 CORREGIDO: Usando 'showFilters' en lugar de variables inexistentes */}
             <button 
               onClick={() => setShowFilters(!showFilters)} 
               className={`px-4 py-2 rounded-xl text-xs font-black border transition-all flex items-center gap-1.5 active:scale-95 ${showFilters ? 'bg-orange-500 border-orange-600 text-white shadow-md' : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'}`}
@@ -212,9 +220,22 @@ export default function KitchenPage() {
           </div>
         </div>
 
-        {/* 💡 CORREGIDO: El panel de control usa 'showFilters' */}
+        {/* PANEL DE MODULARIZACIÓN Y FILTROS */}
         {showFilters && (
           <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 animate-fade-in space-y-4 shadow-inner">
+            
+            {/* Botón de restablecimiento rápido */}
+            <div className="flex justify-between items-center border-b border-gray-200 pb-2">
+              <span className="text-xs font-black text-gray-700">Ajustes de Estación</span>
+              {/* 💡 CORREGIDO: Ahora sí llama a la función declarada arriba */}
+              <button 
+                onClick={handleResetFilters} 
+                className="text-[10px] bg-white border border-gray-200 hover:bg-gray-100 text-gray-500 font-bold px-2 py-1 rounded active:scale-95 transition-all"
+              >
+                Resetear Filtros 🔄
+              </button>
+            </div>
+
             <div>
               <p className="text-xs font-black text-gray-500 uppercase tracking-wider mb-2">1. Tipos de pedido de esta estación:</p>
               <div className="flex flex-wrap gap-2">
@@ -245,7 +266,6 @@ export default function KitchenPage() {
                   )
                 })}
               </div>
-              {/* 💡 CORREGIDO: Escapando caracteres especiales de HTML */}
               <p className="text-[10px] text-gray-400 mt-2 font-medium">
                 Tip: Si desactivas &quot;Bebidas&quot; en esta pantalla, las bebidas no aparecerán en tus tarjetas, ¡ideal para estaciones separadas!
               </p>
